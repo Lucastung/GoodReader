@@ -6,6 +6,7 @@
 - 資料庫：Cloudflare D1（內建 9 篇公有領域經典文章）
 - 評分：DeepInfra 的 OpenAI 相容 API，預設模型 `deepseek-ai/DeepSeek-V4-Flash`
 - 白名單收集器：程式已寫好（`lib/collector.ts`），白名單還沒放來源，只開放管理端「試抓」API
+- 互動示範：`/demo`（首頁「看互動示範」），用〈桃花源記〉引導走完開文章、列大綱、寫摘要、看評分，不呼叫 API
 
 ## 部署到 Cloudflare
 
