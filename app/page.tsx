@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, api, getClientId, getPref, setAccessCode, setPref } from "@/lib/client";
+import type { Stats } from "@/lib/db";
 
 type ArticleItem = { id: string; title: string; author: string; era: string | null; genre: string; difficulty: number; char_count: number };
 
@@ -13,6 +14,7 @@ export default function Home() {
   const [grade, setGrade] = useState<"junior" | "senior">("junior");
   const [genre, setGenre] = useState("全部");
   const [articles, setArticles] = useState<ArticleItem[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needCode, setNeedCode] = useState(false);
@@ -21,13 +23,17 @@ export default function Home() {
   useEffect(() => {
     const g = getPref("grade");
     if (g === "junior" || g === "senior") setGrade(g);
-    loadArticles();
+    load();
   }, []);
 
-  async function loadArticles() {
+  async function load() {
     try {
-      const r = await api<{ articles: ArticleItem[] }>("/api/articles");
-      setArticles(r.articles);
+      const [a, s] = await Promise.all([
+        api<{ articles: ArticleItem[] }>("/api/articles"),
+        api<Stats>(`/api/me/stats?clientId=${encodeURIComponent(getClientId())}`),
+      ]);
+      setArticles(a.articles);
+      setStats(s);
       setNeedCode(false);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) setNeedCode(true);
@@ -65,12 +71,12 @@ export default function Home() {
     return (
       <section className="card narrow">
         <h1>請輸入通行碼</h1>
-        <p className="muted">這個 demo 有設定通行碼，請向管理者索取。</p>
+        <p className="muted">這個網站有設定通行碼，請向管理者索取。</p>
         <form
           onSubmit={(e) => {
             e.preventDefault();
             setAccessCode(code.trim());
-            loadArticles();
+            load();
           }}
           className="row"
         >
@@ -85,57 +91,35 @@ export default function Home() {
 
   return (
     <div className="home">
-      <section className="hero">
-        <h1>讀一篇，寫下大綱與摘要</h1>
-        <p className="muted">
-          系統會抽一篇經典文章給你。讀完後整理出大綱、寫一段摘要，AI 老師會對照原文告訴你抓到了哪些重點、漏了什麼。
-        </p>
-      </section>
+      <Dashboard stats={stats} onChange={setStats} />
 
-      <section className="card demo-entry">
-        <p>
-          <b>第一次使用？</b>
-          <span className="muted"> 用〈桃花源記〉走一遍：開文章、列大綱、寫摘要、看評分。</span>
-        </p>
-        <a className="primary as-button" href="/demo">
-          看互動示範
-        </a>
-      </section>
-
-      <section className="card">
-        <div className="field">
-          <span className="label">年級</span>
-          <div className="seg" role="radiogroup" aria-label="年級">
-            {(
-              [
-                ["junior", "國中"],
-                ["senior", "高中"],
-              ] as const
-            ).map(([v, t]) => (
-              <button key={v} role="radio" aria-checked={grade === v} className={grade === v ? "on" : ""} onClick={() => chooseGrade(v)}>
-                {t}
-              </button>
-            ))}
-          </div>
+      <section className="card picker">
+        <div className="seg" role="radiogroup" aria-label="年級">
+          {(
+            [
+              ["junior", "國中"],
+              ["senior", "高中"],
+            ] as const
+          ).map(([v, t]) => (
+            <button key={v} role="radio" aria-checked={grade === v} className={grade === v ? "on" : ""} onClick={() => chooseGrade(v)}>
+              {t}
+            </button>
+          ))}
         </div>
-        <div className="field">
-          <span className="label">文體</span>
-          <div className="seg" role="radiogroup" aria-label="文體">
-            {GENRE_OPTIONS.map((g) => (
-              <button key={g} role="radio" aria-checked={genre === g} className={genre === g ? "on" : ""} onClick={() => setGenre(g)}>
-                {g}
-              </button>
-            ))}
-          </div>
-        </div>
-        <button className="primary big" disabled={busy} onClick={() => start()}>
-          {busy ? "抽文章中…" : "隨機抽一篇開始"}
+        <select value={genre} onChange={(e) => setGenre(e.target.value)} aria-label="文體">
+          {GENRE_OPTIONS.map((g) => (
+            <option key={g} value={g}>
+              {g === "全部" ? "全部" : g}
+            </option>
+          ))}
+        </select>
+        <button className="primary" disabled={busy} onClick={() => start()}>
+          {busy ? "抽文章中…" : "隨機抽一篇"}
         </button>
-        {error && <p className="error">{error}</p>}
       </section>
+      {error && <p className="error">{error}</p>}
 
-      <section>
-        <h2 className="section-title">或自己挑一篇</h2>
+      <section className="list-pane" aria-label="文章清單">
         <ul className="article-list">
           {shown.map((a) => (
             <li key={a.id}>
@@ -154,5 +138,144 @@ export default function Home() {
         </ul>
       </section>
     </div>
+  );
+}
+
+function Dashboard({ stats, onChange }: { stats: Stats | null; onChange: (s: Stats) => void }) {
+  const [amount, setAmount] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const s = stats ?? {
+    completed: 0,
+    byDifficulty: [1, 2, 3, 4, 5].map((d) => ({ difficulty: d, count: 0, avg: null })),
+    totalPoints: 0,
+    redeemed: 0,
+    remaining: 0,
+  };
+  const pts = Number(amount);
+  const valid = Number.isInteger(pts) && pts > 0 && pts <= s.remaining;
+
+  async function redeem() {
+    setSaving(true);
+    setMsg(null);
+    try {
+      const next = await api<Stats>("/api/me/redeem", {
+        method: "POST",
+        body: JSON.stringify({ clientId: getClientId(), points: pts }),
+      });
+      onChange(next);
+      setMsg(`已扣除 ${pts} 點`);
+      setAmount("");
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setSaving(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <section className="card dash" aria-label="我的學習概況">
+      <div className="dash-row">
+        <div className="stat">
+          <span className="stat-label">完成篇數</span>
+          <span className="stat-num">{s.completed}</span>
+          <span className="stat-unit">篇</span>
+        </div>
+        <DifficultyChart data={s.byDifficulty} />
+      </div>
+      <div className="dash-row points">
+        <div className="stat">
+          <span className="stat-label">剩餘積分 / 總積分</span>
+          <span className="stat-num">
+            {s.remaining}
+            <span className="of"> / {s.totalPoints}</span>
+          </span>
+        </div>
+        <div className="redeem">
+          {confirming ? (
+            <>
+              <span className="small">確定扣除 {pts} 點？</span>
+              <button className="primary" onClick={redeem} disabled={saving}>
+                {saving ? "處理中…" : "確定"}
+              </button>
+              <button className="ghost" onClick={() => setConfirming(false)} disabled={saving}>
+                取消
+              </button>
+            </>
+          ) : (
+            <>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={s.remaining}
+                step={1}
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setMsg(null);
+                }}
+                placeholder="點數"
+                aria-label="本次要扣除（折現）的點數"
+              />
+              <button className="primary" onClick={() => setConfirming(true)} disabled={!valid}>
+                扣除
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      {msg && <p className="small muted dash-msg">{msg}</p>}
+      {amount !== "" && !valid && !confirming && (
+        <p className="small error dash-msg">請輸入 1–{s.remaining} 之間的整數</p>
+      )}
+    </section>
+  );
+}
+
+/** 各難度平均分（0–100）直條圖；沒做過的難度顯示「—」 */
+function DifficultyChart({ data }: { data: Stats["byDifficulty"] }) {
+  return (
+    <figure className="dchart" aria-label="各難度平均評分">
+      <figcaption>各難度平均評分</figcaption>
+      <div className="dchart-plot">
+        {data.map((d) => (
+          <div
+            key={d.difficulty}
+            className="dchart-col"
+            title={d.avg == null ? `難度 ${d.difficulty}：尚未練習` : `難度 ${d.difficulty}：平均 ${d.avg} 分（${d.count} 篇）`}
+          >
+            <span className="dchart-val">{d.avg ?? "—"}</span>
+            <div className="dchart-track">
+              {d.avg != null && <div className="dchart-bar" style={{ height: `${Math.max(2, d.avg)}%` }} />}
+            </div>
+            <span className="dchart-x">{d.difficulty}</span>
+          </div>
+        ))}
+      </div>
+      <span className="dchart-axis">難度</span>
+      <table className="sr-only">
+        <caption>各難度平均評分</caption>
+        <thead>
+          <tr>
+            <th>難度</th>
+            <th>平均分</th>
+            <th>篇數</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((d) => (
+            <tr key={d.difficulty}>
+              <td>{d.difficulty}</td>
+              <td>{d.avg ?? "—"}</td>
+              <td>{d.count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </figure>
   );
 }

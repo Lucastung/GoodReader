@@ -172,3 +172,55 @@ export async function gradesInLastHour(db: D1Database, clientId: string): Promis
     .first<{ n: number }>();
   return r?.n ?? 0;
 }
+
+// ---------- 首頁儀表板 ----------
+
+export type Stats = {
+  completed: number;
+  byDifficulty: { difficulty: number; count: number; avg: number | null }[];
+  totalPoints: number;
+  redeemed: number;
+  remaining: number;
+};
+
+/**
+ * 每次練習（session）只取最高分，避免重複送出同一篇來刷分。
+ * 總積分 = 各次練習最高分的總和；剩餘 = 總積分 − 已扣除。
+ */
+export async function getStats(db: D1Database, clientId: string): Promise<Stats> {
+  const [rows, red] = await db.batch([
+    db
+      .prepare(
+        `WITH best AS (
+           SELECT s.id, a.difficulty, MAX(g.total) AS best
+           FROM sessions s
+           JOIN articles a ON a.id = s.article_id
+           JOIN attempts t ON t.session_id = s.id
+           JOIN grades g ON g.attempt_id = t.id
+           WHERE s.client_id = ?
+           GROUP BY s.id
+         )
+         SELECT difficulty, COUNT(*) AS n, AVG(best) AS avg, SUM(best) AS total FROM best GROUP BY difficulty`,
+      )
+      .bind(clientId),
+    db.prepare("SELECT COALESCE(SUM(points), 0) AS redeemed FROM redemptions WHERE client_id = ?").bind(clientId),
+  ]);
+  const byD = new Map(
+    (rows.results as { difficulty: number; n: number; avg: number; total: number }[]).map((r) => [r.difficulty, r]),
+  );
+  const byDifficulty = [1, 2, 3, 4, 5].map((d) => {
+    const r = byD.get(d);
+    return { difficulty: d, count: r?.n ?? 0, avg: r ? Math.round(r.avg) : null };
+  });
+  const completed = byDifficulty.reduce((n, r) => n + r.count, 0);
+  const totalPoints = [...byD.values()].reduce((n, r) => n + r.total, 0);
+  const redeemed = (red.results[0] as { redeemed: number }).redeemed;
+  return { completed, byDifficulty, totalPoints, redeemed, remaining: totalPoints - redeemed };
+}
+
+export async function addRedemption(db: D1Database, clientId: string, points: number) {
+  await db
+    .prepare("INSERT INTO redemptions (id, client_id, points) VALUES (?, ?, ?)")
+    .bind(crypto.randomUUID(), clientId, points)
+    .run();
+}

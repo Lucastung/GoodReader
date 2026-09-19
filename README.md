@@ -1,4 +1,4 @@
-# GoodReader｜讀懂一篇：中文閱讀理解練習（Demo）
+# GoodReader｜好好讀書：中文閱讀理解練習
 
 學生讀一篇經典文章 → 寫大綱與摘要 → DeepSeek（經 DeepInfra）對照原文評分並給回饋。
 
@@ -6,7 +6,7 @@
 - 資料庫：Cloudflare D1（內建 9 篇公有領域經典文章）
 - 評分：DeepInfra 的 OpenAI 相容 API，預設模型 `deepseek-ai/DeepSeek-V4-Flash`
 - 白名單收集器：程式已寫好（`lib/collector.ts`），白名單還沒放來源，只開放管理端「試抓」API
-- 互動示範：`/demo`（首頁「看互動示範」），用〈桃花源記〉引導走完開文章、列大綱、寫摘要、看評分，不呼叫 API
+- 互動示範：`/demo`（頁首 DEMO 鈕），用〈桃花源記〉引導走完開文章、列大綱、寫摘要、看評分，不呼叫 API
 
 ## 部署到 Cloudflare
 
@@ -112,7 +112,8 @@ npx wrangler d1 execute goodreader-db --remote --file migrations/0002_seed_class
 
 ```
 app/                     頁面與 API 路由
-  page.tsx               首頁：選年級、文體、抽文章
+  page.tsx               首頁：學習概況（完成篇數、各難度平均、積分與扣除）、選文章
+  demo/page.tsx          互動示範
   practice/[id]/page.tsx 閱讀、大綱編輯器、摘要、評分結果
   api/sessions/…         抽文、取回練習、送出評分
   api/admin/collector-test  管理端試抓白名單網址
@@ -124,6 +125,12 @@ lib/
 migrations/                       D1 schema 與經典文章種子資料
 data/classics.json                內建文章原始資料
 ```
+
+## 積分
+
+- 每次練習取最高分計入（重複送出同一次練習不會重複加分）；總積分 = 各次練習最高分的總和。
+- 首頁可輸入點數按「扣除」，把積分折現；剩餘積分 = 總積分 − 已扣除。扣除紀錄存在 `redemptions` 表。
+- 目前沒有登入，積分跟著瀏覽器（匿名 ID）走，換瀏覽器或清除網站資料會看不到原本的紀錄。
 
 ## Demo 還沒做的
 
