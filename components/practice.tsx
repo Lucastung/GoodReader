@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { GradeResult } from "@/lib/grader";
 import { MAX_LEVEL, normalizeRows, type OutlineRow } from "@/lib/outline";
 import type { OutlineNode } from "@/lib/schemas";
+import { MicButton } from "./speech";
 
 export type AttemptResult = GradeResult & { attemptId: string; readSeconds: number };
 
@@ -17,7 +18,20 @@ export function OutlineEditor({ rows, onChange }: { rows: OutlineRow[]; onChange
     if (focusIdx != null) refs.current[focusIdx]?.focus();
   }, [focusIdx, rows.length]);
 
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const dictBase = useRef(new Map<number, string>());
+
   const update = (next: OutlineRow[]) => onChange(normalizeRows(next));
+  /** 聽寫：暫時結果即時顯示，最終結果接在原本文字後面 */
+  const dictate = (i: number, text: string, final: boolean) => {
+    const cur = rowsRef.current;
+    if (!cur[i]) return;
+    if (!dictBase.current.has(i)) dictBase.current.set(i, cur[i].text);
+    const base = dictBase.current.get(i)!;
+    update(cur.map((r, j) => (j === i ? { ...r, text: base + text } : r)));
+    if (final) dictBase.current.delete(i);
+  };
   const setText = (i: number, text: string) => update(rows.map((r, j) => (j === i ? { ...r, text } : r)));
   const shift = (i: number, d: number) =>
     update(rows.map((r, j) => (j === i ? { ...r, level: Math.max(0, Math.min(MAX_LEVEL, r.level + d)) } : r)));
@@ -61,6 +75,7 @@ export function OutlineEditor({ rows, onChange }: { rows: OutlineRow[]; onChange
             aria-label={`大綱第 ${i + 1} 條`}
           />
           <div className="row-tools">
+            <MicButton onText={(t, f) => dictate(i, t, f)} label={`語音輸入第 ${i + 1} 條`} />
             <button type="button" onClick={() => shift(i, -1)} disabled={r.level === 0} aria-label="往外一層">
               ←
             </button>

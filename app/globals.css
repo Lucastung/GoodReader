@@ -260,3 +260,21 @@ kbd { font: 0.8rem var(--sans); border: 1px solid var(--line); border-bottom-wid
   .redeem-confirm span { width: 100%; }
   .redeem-confirm input { flex: 1; width: auto; }
 }
+
+/* 朗讀與聽寫 */
+.read-aloud { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.read-aloud select { padding: 5px 8px; font-size: 0.85rem; }
+.read-aloud .ghost { margin-top: 0; }
+.small-btn { padding: 6px 12px; font-size: 0.9rem; }
+button.pid { cursor: pointer; background: none; font: inherit; font-family: var(--sans); font-size: 0.7rem; line-height: 1.4; }
+button.pid:hover { border-color: var(--accent); color: var(--accent); }
+.text p.reading { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.mic {
+  background: none; border: 1px solid var(--line); border-radius: 6px; width: 30px; height: 34px;
+  font-size: 0.9rem; line-height: 1; padding: 0; flex-shrink: 0;
+}
+.mic.on { border-color: var(--lv-d); color: var(--lv-d); background: var(--accent-soft); animation: mic-pulse 1s ease-in-out infinite; }
+@keyframes mic-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .mic.on { animation: none; } }
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.field-head h2 { margin-bottom: 0.2rem; }

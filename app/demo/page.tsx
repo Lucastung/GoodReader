@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OutlineEditor, ResultView, type AttemptResult } from "@/components/practice";
+import { MicButton, ReadAloudBar, useDictationTarget, useReadAloud } from "@/components/speech";
 import {
   DEMO_ARTICLE,
   DEMO_COPIED_SUMMARY,
@@ -62,6 +63,9 @@ export default function DemoPage() {
   const [highlight, setHighlight] = useState<string | null>(null);
   const [rows, setRows] = useState<OutlineRow[]>([{ text: "", level: 0 }]);
   const [summary, setSummary] = useState("");
+  const summaryRef = useRef(summary);
+  summaryRef.current = summary;
+  const dictSummary = useDictationTarget(() => summaryRef.current, setSummary);
   const [typing, setTyping] = useState(false);
   const [grading, setGrading] = useState(false);
   const [graded, setGraded] = useState(false);
@@ -69,6 +73,7 @@ export default function DemoPage() {
   const typingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const article = DEMO_ARTICLE;
+  const reader = useReadAloud(article.paragraphs, article.title);
   const fullText = useMemo(() => article.paragraphs.map((p) => p.text).join(""), [article]);
   const summaryRange = suggestedSummaryRange(article.charCount);
   const filledRows = rows.filter((r) => r.text.trim()).length;
@@ -186,6 +191,7 @@ export default function DemoPage() {
         <ul>
           <li>每段前面的 <span className="pid">P1</span> 是段落編號，評分時會用它告訴你「回去看哪一段」。</li>
           <li>右上角「蓋起原文」可以把文章藏起來，練習憑記憶寫大綱。</li>
+          <li>按「🔊 朗讀全文」可以用手機或電腦內建的語音聽文章；點段落編號可從那段開始讀。</li>
           <li>標題下方有朝代、作者、文體與字數；文言文的大綱和摘要要用白話寫。</li>
         </ul>
       </>
@@ -198,6 +204,7 @@ export default function DemoPage() {
           <li>一行寫一個重點，按 <kbd>Enter</kbd> 新增下一條。</li>
           <li>按 <b>→</b>（或 <kbd>Tab</kbd>）把這條變成上一條的細項，<b>←</b> 退回上一層，最多 3 層。</li>
           <li>建議第一層寫「段落在做什麼」，第二層寫細節。</li>
+          <li>每一條旁邊的 🎤 可以用說的輸入（瀏覽器會先問你能不能用麥克風）。</li>
         </ul>
         <div className="coach-actions">
           <button className="primary" onClick={addSampleRow} disabled={nextSampleIndex === -1}>
@@ -323,11 +330,22 @@ export default function DemoPage() {
               蓋起原文
             </label>
           </div>
+          <ReadAloudBar ctl={reader} />
           {!hideArticle && (
             <div className="text">
               {article.paragraphs.map((p) => (
-                <p key={p.id} id={`para-${p.id}`} className={highlight === p.id ? "hl" : ""}>
-                  <span className="pid">{p.id}</span>
+                <p
+                  key={p.id}
+                  id={`para-${p.id}`}
+                  className={[highlight === p.id ? "hl" : "", reader.current === p.id ? "reading" : ""].join(" ")}
+                >
+                  {reader.supported ? (
+                    <button type="button" className="pid" onClick={() => reader.play(p.id)} title={`從 ${p.id} 開始朗讀`}>
+                      {p.id}
+                    </button>
+                  ) : (
+                    <span className="pid">{p.id}</span>
+                  )}
                   {p.text}
                 </p>
               ))}
@@ -348,7 +366,10 @@ export default function DemoPage() {
           </div>
 
           <div id="summary-card" className={`block${step === 2 ? " spot" : ""}`}>
-            <h2>摘要</h2>
+            <div className="field-head">
+              <h2>摘要</h2>
+              {step >= 2 && <MicButton onText={dictSummary} label="語音輸入摘要" />}
+            </div>
             <p className="hint">
               用自己的話寫，建議 {summaryRange[0]}–{summaryRange[1]} 字。請用白話，不要整句照抄原文。
             </p>

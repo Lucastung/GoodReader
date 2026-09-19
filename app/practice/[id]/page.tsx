@@ -6,6 +6,7 @@ import { ApiError, api, getPref, setPref } from "@/lib/client";
 import type { Article } from "@/lib/db";
 import { rowsToTree, type OutlineRow } from "@/lib/outline";
 import { OutlineEditor, ResultView, type AttemptResult } from "@/components/practice";
+import { MicButton, ReadAloudBar, useDictationTarget, useReadAloud } from "@/components/speech";
 
 type SessionData = {
   sessionId: string;
@@ -14,6 +15,7 @@ type SessionData = {
   summaryRange: [number, number];
 };
 
+const NO_PARAGRAPHS: Article["paragraphs"] = [];
 const hanCount = (s: string) => (s.match(/\p{Script=Han}/gu) || []).length;
 
 export default function PracticePage() {
@@ -23,6 +25,10 @@ export default function PracticePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rows, setRows] = useState<OutlineRow[]>([{ text: "", level: 0 }]);
   const [summary, setSummary] = useState("");
+  const summaryRef = useRef(summary);
+  summaryRef.current = summary;
+  const dictSummary = useDictationTarget(() => summaryRef.current, setSummary);
+  const reader = useReadAloud(data?.article.paragraphs ?? NO_PARAGRAPHS, data?.article.title);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [result, setResult] = useState<AttemptResult | null>(null);
@@ -132,11 +138,22 @@ export default function PracticePage() {
             蓋起原文
           </label>
         </div>
+        <ReadAloudBar ctl={reader} />
         {!hideArticle && (
           <div className="text">
             {article.paragraphs.map((p) => (
-              <p key={p.id} id={`para-${p.id}`} className={highlight === p.id ? "hl" : ""}>
-                <span className="pid">{p.id}</span>
+              <p
+                key={p.id}
+                id={`para-${p.id}`}
+                className={[highlight === p.id ? "hl" : "", reader.current === p.id ? "reading" : ""].join(" ")}
+              >
+                {reader.supported ? (
+                  <button type="button" className="pid" onClick={() => reader.play(p.id)} title={`從 ${p.id} 開始朗讀`}>
+                    {p.id}
+                  </button>
+                ) : (
+                  <span className="pid">{p.id}</span>
+                )}
                 {p.text}
               </p>
             ))}
@@ -159,7 +176,10 @@ export default function PracticePage() {
         </p>
         <OutlineEditor rows={rows} onChange={setRows} />
 
-        <h2>摘要</h2>
+        <div className="field-head">
+          <h2>摘要</h2>
+          <MicButton onText={dictSummary} label="語音輸入摘要" />
+        </div>
         <p className="hint">
           用自己的話寫，建議 {summaryRange[0]}–{summaryRange[1]} 字。{isClassical && "請用白話，不要整句照抄原文。"}
         </p>
