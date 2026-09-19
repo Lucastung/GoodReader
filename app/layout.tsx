@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { UserMenu } from "@/components/UserMenu";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,9 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/" className="brand">
             好好讀書
           </Link>
-          <Link href="/demo" className="demo-btn" title="互動示範：開文章、列大綱、寫摘要、看評分">
-            DEMO
-          </Link>
+          <UserMenu />
         </header>
         <main>{children}</main>
       </body>

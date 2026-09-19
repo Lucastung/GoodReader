@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getArticle, getSession, gradesInLastHour, saveAttemptAndGrade } from "@/lib/db";
 import { gradeAttempt } from "@/lib/grader";
-import { GRADES_PER_HOUR, checkAccess, cfEnv, jsonError } from "@/lib/http";
+import { GRADES_PER_HOUR, checkAccess, cfEnv, jsonError, requireUser } from "@/lib/http";
 import { SubmitAttemptInput } from "@/lib/schemas";
 import { precheck } from "@/lib/textcheck";
 
@@ -12,9 +12,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (denied) return denied;
   const { id } = await params;
 
+  const user = await requireUser(req, env);
+  if (user instanceof Response) return user;
+  const clientId = user.id;
+
   const parsed = SubmitAttemptInput.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError(400, "大綱或摘要格式錯誤");
-  const { clientId, outline, summary } = parsed.data;
+  const { outline, summary } = parsed.data;
 
   const session = await getSession(env.DB, id);
   if (!session || session.client_id !== clientId) return jsonError(404, "找不到這次練習");

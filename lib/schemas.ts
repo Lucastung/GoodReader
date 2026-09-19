@@ -31,14 +31,12 @@ export type Paragraph = { id: string; text: string };
 
 // ---- API 輸入 ----
 export const StartSessionInput = z.object({
-  clientId: z.string().min(8).max(64),
   grade: z.enum(GRADES),
   genre: z.enum(GENRES).optional(),
   articleId: z.string().max(64).optional(),
 });
 
 export const SubmitAttemptInput = z.object({
-  clientId: z.string().min(8).max(64),
   outline: OutlineSchema,
   summary: z.string().trim().max(1200),
 });

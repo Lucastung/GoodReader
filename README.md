@@ -116,24 +116,40 @@ app/                     頁面與 API 路由
   demo/page.tsx          互動示範
   practice/[id]/page.tsx 閱讀、大綱編輯器、摘要、評分結果
   api/sessions/…         抽文、取回練習、送出評分
-  api/admin/collector-test  管理端試抓白名單網址
+  login/page.tsx         登入／建立帳號
+  api/auth/…             註冊、登入、登出、目前使用者
+  api/me/…               學習概況、積分扣除
+  api/admin/…            試抓白名單網址、重設 PIN
 lib/
   grader.ts  prompts.ts  llm.ts   評分流程、提示詞、DeepInfra 呼叫
   rubric.ts  textcheck.ts         配分、抄錄偵測、前檢查
   collector.ts                    白名單收集器
   db.ts                           D1 存取
+  auth.ts                         帳號、PIN 雜湊、登入狀態、錯誤鎖定
 migrations/                       D1 schema 與經典文章種子資料
 data/classics.json                內建文章原始資料
 ```
 
-## 積分
+## 帳號與積分
 
-- 每次練習取最高分計入（重複送出同一次練習不會重複加分）；總積分 = 各次練習最高分的總和。
-- 首頁可輸入點數按「扣除」，把積分折現；剩餘積分 = 總積分 − 已扣除。扣除紀錄存在 `redemptions` 表。
-- 目前沒有登入，積分跟著瀏覽器（匿名 ID）走，換瀏覽器或清除網站資料會看不到原本的紀錄。
+- 學生用「暱稱＋PIN（4–6 位數字）」建立帳號；積分綁帳號，換裝置登入都看得到。第一次登入時，這台瀏覽器先前的匿名練習紀錄會併入帳號。
+- PIN 以 PBKDF2-SHA256（加 salt）雜湊保存；登入狀態是 30 天的 HttpOnly cookie（資料庫只存 token 的 SHA-256）。
+- 同一暱稱 15 分鐘內 PIN 錯 5 次會暫停登入；家長 PIN 也一樣。
+- 每次練習取最高分計入積分（重交不會重複加分）；剩餘積分 = 總積分 − 已扣除。
+- 「扣除」需要家長 PIN：帳號第一次扣除時由家長設定（不能和學生 PIN 相同），之後每次扣除都要輸入。
+- 忘記 PIN（需先設定 `ADMIN_TOKEN` secret）：
+
+```bash
+# 重設學生 PIN（同時登出所有裝置）
+curl -X POST https://goodreader.gkb4u.com/api/admin/reset-pin \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" -H "Content-Type: application/json" \
+  -d '{"nickname":"小明","pin":"1234"}'
+# 清除家長 PIN（下次扣除時重新設定）
+curl ... -d '{"nickname":"小明","clearParentPin":true}'
+```
 
 ## Demo 還沒做的
 
-- 登入（目前以瀏覽器產生的匿名 ID 區分使用者；每個 ID 每小時最多評分 20 次）
+- 家長／教師端介面（目前重設 PIN 只能用管理端 API）
 - 白名單來源、R2 快照、每日清理排程
 - 教師端（第二階段）

@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiError, api, getClientId, getPref, setAccessCode, setPref } from "@/lib/client";
+import { ApiError, api, getPref, setAccessCode, setPref } from "@/lib/client";
 import type { Stats } from "@/lib/db";
 
+type Me = { id: string; nickname: string; hasParentPin: boolean } | null;
 type ArticleItem = { id: string; title: string; author: string; era: string | null; genre: string; difficulty: number; char_count: number };
 
 const GENRE_OPTIONS = ["全部", "文言文", "散文", "記敘文"];
@@ -15,6 +16,7 @@ export default function Home() {
   const [genre, setGenre] = useState("全部");
   const [articles, setArticles] = useState<ArticleItem[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [me, setMe] = useState<Me | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needCode, setNeedCode] = useState(false);
@@ -28,12 +30,13 @@ export default function Home() {
 
   async function load() {
     try {
-      const [a, s] = await Promise.all([
+      const [a, m] = await Promise.all([
         api<{ articles: ArticleItem[] }>("/api/articles"),
-        api<Stats>(`/api/me/stats?clientId=${encodeURIComponent(getClientId())}`),
+        api<{ user: Me }>("/api/auth/me"),
       ]);
       setArticles(a.articles);
-      setStats(s);
+      setMe(m.user);
+      if (m.user) setStats(await api<Stats>("/api/me/stats"));
       setNeedCode(false);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) setNeedCode(true);
@@ -42,13 +45,16 @@ export default function Home() {
   }
 
   async function start(articleId?: string) {
+    if (!me) {
+      window.location.href = "/login?next=/";
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const r = await api<{ sessionId: string }>("/api/sessions", {
         method: "POST",
         body: JSON.stringify({
-          clientId: getClientId(),
           grade,
           genre: genre === "全部" ? undefined : genre,
           articleId,
@@ -91,7 +97,28 @@ export default function Home() {
 
   return (
     <div className="home">
-      <Dashboard stats={stats} onChange={setStats} />
+      {me === undefined ? (
+        <section className="card dash muted">載入中…</section>
+      ) : me ? (
+        <Dashboard
+          stats={stats}
+          hasParentPin={me.hasParentPin}
+          onChange={(s) => {
+            setStats(s);
+            setMe({ ...me, hasParentPin: true });
+          }}
+        />
+      ) : (
+        <section className="card dash login-cta">
+          <div>
+            <b>登入後開始累積積分</b>
+            <p className="muted small">用暱稱＋PIN 建立帳號，換手機或電腦都看得到自己的成績。</p>
+          </div>
+          <a className="primary as-button" href="/login">
+            登入／建立帳號
+          </a>
+        </section>
+      )}
 
       <section className="card picker">
         <div className="seg" role="radiogroup" aria-label="年級">
@@ -141,8 +168,18 @@ export default function Home() {
   );
 }
 
-function Dashboard({ stats, onChange }: { stats: Stats | null; onChange: (s: Stats) => void }) {
+function Dashboard({
+  stats,
+  hasParentPin,
+  onChange,
+}: {
+  stats: Stats | null;
+  hasParentPin: boolean;
+  onChange: (s: Stats) => void;
+}) {
   const [amount, setAmount] = useState("");
+  const [parentPin, setParentPin] = useState("");
+  const [parentPin2, setParentPin2] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -157,22 +194,31 @@ function Dashboard({ stats, onChange }: { stats: Stats | null; onChange: (s: Sta
   const pts = Number(amount);
   const valid = Number.isInteger(pts) && pts > 0 && pts <= s.remaining;
 
+  const pinOk = /^\d{4,6}$/.test(parentPin) && (hasParentPin || parentPin === parentPin2);
+
+  function cancel() {
+    setConfirming(false);
+    setParentPin("");
+    setParentPin2("");
+  }
+
   async function redeem() {
     setSaving(true);
     setMsg(null);
     try {
       const next = await api<Stats>("/api/me/redeem", {
         method: "POST",
-        body: JSON.stringify({ clientId: getClientId(), points: pts }),
+        body: JSON.stringify({ points: pts, parentPin, setupParentPin: !hasParentPin }),
       });
       onChange(next);
       setMsg(`已扣除 ${pts} 點`);
       setAmount("");
+      cancel();
     } catch (e) {
       setMsg((e as Error).message);
+      setParentPin("");
     } finally {
       setSaving(false);
-      setConfirming(false);
     }
   }
 
@@ -196,15 +242,46 @@ function Dashboard({ stats, onChange }: { stats: Stats | null; onChange: (s: Sta
         </div>
         <div className="redeem">
           {confirming ? (
-            <>
-              <span className="small">確定扣除 {pts} 點？</span>
-              <button className="primary" onClick={redeem} disabled={saving}>
-                {saving ? "處理中…" : "確定"}
+            <form
+              className="redeem-confirm"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (pinOk) redeem();
+              }}
+            >
+              <span className="small">
+                扣除 {pts} 點。{hasParentPin ? "請家長輸入 PIN：" : "第一次扣除，請家長設定 PIN（4–6 位數字）："}
+              </span>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                value={parentPin}
+                onChange={(e) => setParentPin(e.target.value.replace(/\D/g, ""))}
+                placeholder="家長 PIN"
+                aria-label="家長 PIN"
+                autoComplete="off"
+                autoFocus
+              />
+              {!hasParentPin && (
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={parentPin2}
+                  onChange={(e) => setParentPin2(e.target.value.replace(/\D/g, ""))}
+                  placeholder="再輸入一次"
+                  aria-label="再輸入一次家長 PIN"
+                  autoComplete="off"
+                />
+              )}
+              <button className="primary" disabled={saving || !pinOk}>
+                {saving ? "處理中…" : "確定扣除"}
               </button>
-              <button className="ghost" onClick={() => setConfirming(false)} disabled={saving}>
+              <button type="button" className="ghost" onClick={cancel} disabled={saving}>
                 取消
               </button>
-            </>
+            </form>
           ) : (
             <>
               <input

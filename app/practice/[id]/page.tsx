@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, api, getClientId, getPref, setPref } from "@/lib/client";
+import { ApiError, api, getPref, setPref } from "@/lib/client";
 import type { Article } from "@/lib/db";
 import { rowsToTree, type OutlineRow } from "@/lib/outline";
 import { OutlineEditor, ResultView, type AttemptResult } from "@/components/practice";
@@ -33,7 +33,7 @@ export default function PracticePage() {
   const loaded = useRef(false);
 
   useEffect(() => {
-    api<SessionData>(`/api/sessions/${id}?clientId=${encodeURIComponent(getClientId())}`)
+    api<SessionData>(`/api/sessions/${id}`)
       .then((d) => {
         setData(d);
         try {
@@ -49,7 +49,13 @@ export default function PracticePage() {
         setHideArticle(getPref("closedBook") === "1");
         loaded.current = true;
       })
-      .catch((e: Error) => setLoadError(e instanceof ApiError && e.status === 401 ? "需要通行碼，請回首頁輸入。" : e.message));
+      .catch((e: Error) => {
+        if (e instanceof ApiError && e.status === 401 && e.message === "請先登入") {
+          window.location.href = `/login?next=${encodeURIComponent(`/practice/${id}`)}`;
+          return;
+        }
+        setLoadError(e instanceof ApiError && e.status === 401 ? "需要通行碼，請回首頁輸入。" : e.message);
+      });
   }, [id, draftKey]);
 
   // 草稿自動存在這台瀏覽器
@@ -75,7 +81,7 @@ export default function PracticePage() {
     try {
       const r = await api<AttemptResult>(`/api/sessions/${id}/attempts`, {
         method: "POST",
-        body: JSON.stringify({ clientId: getClientId(), outline: rowsToTree(rows), summary }),
+        body: JSON.stringify({ outline: rowsToTree(rows), summary }),
       });
       setResult(r);
       setHistory((h) => [...h, r.total]);
@@ -91,7 +97,7 @@ export default function PracticePage() {
     if (!data) return;
     const r = await api<{ sessionId: string }>("/api/sessions", {
       method: "POST",
-      body: JSON.stringify({ clientId: getClientId(), grade: data.grade }),
+      body: JSON.stringify({ grade: data.grade }),
     });
     router.push(`/practice/${r.sessionId}`);
   }

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { getStats } from "@/lib/db";
-import { checkAccess, cfEnv, jsonError } from "@/lib/http";
+import { checkAccess, cfEnv, requireUser } from "@/lib/http";
 
 export async function GET(req: Request) {
   const env = cfEnv();
   const denied = checkAccess(req, env);
   if (denied) return denied;
-  const clientId = new URL(req.url).searchParams.get("clientId") ?? "";
-  if (clientId.length < 8 || clientId.length > 64) return jsonError(400, "參數錯誤");
-  return NextResponse.json(await getStats(env.DB, clientId));
+  const user = await requireUser(req, env);
+  if (user instanceof Response) return user;
+  return NextResponse.json(await getStats(env.DB, user.id));
 }

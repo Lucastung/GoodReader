@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getArticle, getSession, listAttempts } from "@/lib/db";
-import { checkAccess, cfEnv, jsonError } from "@/lib/http";
+import { checkAccess, cfEnv, jsonError, requireUser } from "@/lib/http";
 import { suggestedSummaryRange } from "@/lib/textcheck";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -8,7 +8,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const denied = checkAccess(req, env);
   if (denied) return denied;
   const { id } = await params;
-  const clientId = new URL(req.url).searchParams.get("clientId");
+  const user = await requireUser(req, env);
+  if (user instanceof Response) return user;
+  const clientId = user.id;
 
   const session = await getSession(env.DB, id);
   if (!session || session.client_id !== clientId) return jsonError(404, "找不到這次練習");

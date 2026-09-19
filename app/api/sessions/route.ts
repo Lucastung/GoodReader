@@ -2,7 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { NextResponse } from "next/server";
 import { createSession, getArticle, pickArticle, recentArticleIds } from "@/lib/db";
 import { ensureKeypoints } from "@/lib/grader";
-import { checkAccess, cfEnv, jsonError } from "@/lib/http";
+import { checkAccess, cfEnv, jsonError, requireUser } from "@/lib/http";
 import { StartSessionInput } from "@/lib/schemas";
 import { suggestedSummaryRange } from "@/lib/textcheck";
 
@@ -12,9 +12,13 @@ export async function POST(req: Request) {
   const denied = checkAccess(req, env);
   if (denied) return denied;
 
+  const user = await requireUser(req, env);
+  if (user instanceof Response) return user;
+  const clientId = user.id;
+
   const parsed = StartSessionInput.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError(400, "參數錯誤");
-  const { clientId, grade, genre, articleId } = parsed.data;
+  const { grade, genre, articleId } = parsed.data;
 
   const article = articleId
     ? await getArticle(env.DB, articleId)
