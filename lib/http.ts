@@ -17,13 +17,6 @@ export function checkAccess(req: Request, env: CloudflareEnv): Response | null {
   return jsonError(401, "需要通行碼");
 }
 
-export function checkAdmin(req: Request, env: CloudflareEnv): Response | null {
-  const token = env.ADMIN_TOKEN;
-  if (!token) return jsonError(403, "未設定 ADMIN_TOKEN");
-  if (req.headers.get("authorization") === `Bearer ${token}`) return null;
-  return jsonError(401, "管理權限不足");
-}
-
 export const GRADES_PER_HOUR = 20;
 
 import { SESSION_COOKIE, SESSION_DAYS, currentUser, type User } from "./auth";
@@ -46,3 +39,17 @@ export function withSessionCookie(res: NextResponse, token: string | null, req: 
   return res;
 }
 
+
+import { getAdmin, type Admin, type AdminRole } from "./admin";
+
+/** 後台 API：需要指定角色之一，否則回 401/403 */
+export async function requireAdmin(
+  req: Request,
+  env: CloudflareEnv,
+  roles: AdminRole[] = ["admin"],
+): Promise<Admin | Response> {
+  const a = await getAdmin(req, env);
+  if ("error" in a) return jsonError(a.status, a.error);
+  if (!roles.includes(a.role)) return jsonError(403, "這個功能只有管理者可以使用");
+  return a;
+}

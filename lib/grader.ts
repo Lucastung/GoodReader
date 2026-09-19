@@ -1,4 +1,4 @@
-import { getKeypoints, saveKeypoints, type Article } from "./db";
+import { getKeypoints, logUsage, saveKeypoints, type Article } from "./db";
 import { chatJson, type LlmConfig, type LlmUsage } from "./llm";
 import { mockGrade, mockKeypoints } from "./mock";
 import { gradingPrompt, keypointsPrompt } from "./prompts";
@@ -14,9 +14,9 @@ export function llmConfig(env: CloudflareEnv): LlmConfig {
   };
 }
 
-/** 取得（或第一次產生並快取）文章的要點底稿 */
-export async function ensureKeypoints(env: CloudflareEnv, article: Article): Promise<Keypoints> {
-  const cached = await getKeypoints(env.DB, article.id);
+/** 取得（或第一次產生並快取）文章的要點底稿；force = 後台要求重算 */
+export async function ensureKeypoints(env: CloudflareEnv, article: Article, force = false): Promise<Keypoints> {
+  const cached = force ? null : await getKeypoints(env.DB, article.id);
   if (cached) return cached;
   const cfg = llmConfig(env);
   let kp: Keypoints;
@@ -29,6 +29,7 @@ export async function ensureKeypoints(env: CloudflareEnv, article: Article): Pro
       maxTokens: 3000,
     });
     kp = r.data;
+    await logUsage(env.DB, { kind: "keypoints", model, articleId: article.id, ...r.usage });
   }
   await saveKeypoints(env.DB, article.id, model, kp);
   return kp;

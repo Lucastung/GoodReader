@@ -33,6 +33,7 @@ export async function POST(req: Request) {
     return jsonError(401, "暱稱或 PIN 不正確");
   }
   await clearFailures(env.DB, key);
+  if (row.disabled) return jsonError(403, "這個帳號已停用，請聯絡管理者");
   await claimAnonymous(env.DB, anonId, row.id);
   const token = await startSession(env.DB, row.id);
   return withSessionCookie(NextResponse.json({ user: toUser(row) }), token, req);

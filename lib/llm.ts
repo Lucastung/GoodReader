@@ -28,7 +28,7 @@ export async function chatJson<T>(
   model: string,
   prompt: { system: string; user: string },
   schema: z.ZodType<T>,
-  opts: { maxTokens?: number } = {},
+  opts: { maxTokens?: number; temperature?: number } = {},
 ): Promise<{ data: T; usage: LlmUsage }> {
   if (!cfg.apiKey) throw new Error("尚未設定 DEEPINFRA_API_KEY");
   const messages: { role: string; content: string }[] = [
@@ -46,7 +46,7 @@ export async function chatJson<T>(
       body: JSON.stringify({
         model,
         messages,
-        temperature: 0,
+        temperature: opts.temperature ?? 0,
         max_tokens: opts.maxTokens ?? 3000,
         response_format: { type: "json_object" },
       }),

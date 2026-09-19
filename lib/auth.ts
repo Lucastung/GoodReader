@@ -85,20 +85,21 @@ type UserRow = {
   pin_salt: string;
   parent_pin_hash: string | null;
   parent_pin_salt: string | null;
+  disabled?: number;
 };
 
 const toUser = (r: UserRow): User => ({ id: r.id, nickname: r.nickname, hasParentPin: !!r.parent_pin_hash });
 
 export async function findUserByNickname(db: D1Database, nickname: string) {
   return db
-    .prepare("SELECT id, nickname, pin_hash, pin_salt, parent_pin_hash, parent_pin_salt FROM users WHERE nickname_key = ?")
+    .prepare("SELECT id, nickname, pin_hash, pin_salt, parent_pin_hash, parent_pin_salt, disabled FROM users WHERE nickname_key = ?")
     .bind(nicknameKey(nickname))
     .first<UserRow>();
 }
 
 export async function getUserRow(db: D1Database, id: string) {
   return db
-    .prepare("SELECT id, nickname, pin_hash, pin_salt, parent_pin_hash, parent_pin_salt FROM users WHERE id = ?")
+    .prepare("SELECT id, nickname, pin_hash, pin_salt, parent_pin_hash, parent_pin_salt, disabled FROM users WHERE id = ?")
     .bind(id)
     .first<UserRow>();
 }
@@ -160,7 +161,7 @@ export async function currentUser(req: Request, db: D1Database): Promise<User | 
     .prepare(
       `SELECT u.id, u.nickname, u.pin_hash, u.pin_salt, u.parent_pin_hash, u.parent_pin_salt
        FROM auth_sessions s JOIN users u ON u.id = s.user_id
-       WHERE s.token_hash = ? AND s.expires_at > datetime('now')`,
+       WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND u.disabled = 0`,
     )
     .bind(await sha256(token))
     .first<UserRow>();

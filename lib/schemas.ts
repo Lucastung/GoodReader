@@ -83,3 +83,28 @@ export const LlmGradeSchema = z.object({
   nextStep: z.string(),
 });
 export type LlmGrade = z.infer<typeof LlmGradeSchema>;
+
+// ---- LLM 輸出：AI 範文 ----
+export const GeneratedArticleSchema = z.object({
+  title: z.string().trim().min(1).max(60),
+  paragraphs: z.array(z.string().trim().min(1)).min(2).max(12),
+  centralIdea: z.string().optional().nullable(),
+});
+
+// ---- 後台：文章編輯 ----
+export const ARTICLE_STATUSES = ["draft", "approved", "archived"] as const;
+export const ARTICLE_ORIGINS = ["classic", "ai", "import", "manual"] as const;
+export const LICENSES = ["public-domain", "cc-by", "cc-by-sa", "ai-generated", "authorized", "original"] as const;
+
+export const ArticleInput = z.object({
+  title: z.string().trim().min(1, "請填標題").max(60),
+  author: z.string().trim().min(1, "請填作者").max(40),
+  era: z.string().trim().max(20).nullable().optional(),
+  genre: z.enum(GENRES),
+  difficulty: z.number().int().min(1).max(5),
+  paragraphs: z.array(z.string().trim().min(1)).min(1, "至少一段").max(40),
+  url: z.string().trim().url().max(500).nullable().optional().or(z.literal("")),
+  license: z.enum(LICENSES),
+  notes: z.string().max(2000).nullable().optional(),
+});
+export type ArticleInputT = z.infer<typeof ArticleInput>;

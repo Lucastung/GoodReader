@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { extractArticle, fetchWhitelisted, qualityCheck } from "@/lib/collector";
-import { checkAdmin, cfEnv, jsonError } from "@/lib/http";
+import { cfEnv, jsonError, requireAdmin } from "@/lib/http";
 
 const Input = z.object({
   url: z.string().url(),
@@ -16,8 +16,8 @@ const Input = z.object({
 /** 管理端：用一組白名單規則試抓一篇，回傳正文預覽與品質檢查（不寫入資料庫） */
 export async function POST(req: Request) {
   const env = cfEnv();
-  const denied = checkAdmin(req, env);
-  if (denied) return denied;
+  const admin = await requireAdmin(req, env);
+  if (admin instanceof Response) return admin;
   const parsed = Input.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError(400, "參數錯誤");
   const { url, config } = parsed.data;

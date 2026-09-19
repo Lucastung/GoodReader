@@ -4,3 +4,5 @@ DEEPINFRA_API_KEY=your-deepinfra-key
 LLM_MOCK=0
 DEMO_ACCESS_CODE=
 ADMIN_TOKEN=change-me
+# 本機開發時用這個 email 直接進 /admin（只在 localhost 生效）
+ADMIN_DEV_EMAIL=you@example.com

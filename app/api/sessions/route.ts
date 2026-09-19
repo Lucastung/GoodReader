@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   const { grade, genre, articleId } = parsed.data;
 
   const article = articleId
-    ? await getArticle(env.DB, articleId)
+    ? await getArticle(env.DB, articleId, true)
     : await pickArticle(env.DB, grade, genre, await recentArticleIds(env.DB, clientId));
   if (!article) return jsonError(404, "找不到符合條件的文章");
 

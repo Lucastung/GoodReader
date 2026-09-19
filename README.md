@@ -8,6 +8,7 @@
 - 白名單收集器：程式已寫好（`lib/collector.ts`），白名單還沒放來源，只開放管理端「試抓」API
 - 朗讀與聽寫：文章可「朗讀全文」（瀏覽器內建語音，可選速度、點段落編號從該段讀起）；大綱每一條與摘要都有 🎤 聽寫按鈕（Web Speech API，瀏覽器不支援時自動隱藏）
 - 互動示範：`/demo`（頁首 DEMO 鈕），用〈桃花源記〉引導走完開文章、列大綱、寫摘要、看評分，不呼叫 API
+- 後台：`/admin`（Cloudflare Access 保護），帳戶管理、範文資料庫（AI 撰寫、匯入、審稿上架）、使用與成本統計
 
 ## 部署到 Cloudflare
 
@@ -30,7 +31,7 @@ npm run deploy
 npx wrangler secret put DEEPINFRA_API_KEY
 # 選用：設通行碼，避免網址外流後被別人拿來用
 npx wrangler secret put DEMO_ACCESS_CODE
-# 選用：管理端試抓 API 用
+# 選用：後台 API 的指令列金鑰（curl 用）
 npx wrangler secret put ADMIN_TOKEN
 ```
 
@@ -75,7 +76,11 @@ npm test                          # 評分邏輯、大綱轉換、收集器抽�
 | `LLM_BASE_URL` | wrangler.jsonc vars | 預設 DeepInfra；換成其他 OpenAI 相容服務也可以 |
 | `DEEPINFRA_API_KEY` | secret | 必填 |
 | `DEMO_ACCESS_CODE` | secret | 選用，設了就要輸入通行碼 |
-| `ADMIN_TOKEN` | secret | 選用，`POST /api/admin/collector-test` 用 |
+| `ADMIN_TOKEN` | secret | 選用，用 `Authorization: Bearer …` 從指令列呼叫後台 API（視為管理者；自訂網域有 Access 擋著，指令列請打 `*.workers.dev` 網址） |
+| `ACCESS_TEAM_DOMAIN` | secret | 後台：Zero Trust 團隊網域，例如 `myteam.cloudflareaccess.com` |
+| `ACCESS_AUD` | secret | 後台：Access 應用程式的 Application Audience (AUD) Tag |
+| `ADMIN_EMAILS` | secret | 後台：永遠是管理者的 email，逗號分隔 |
+| `ADMIN_DEV_EMAIL` | .dev.vars | 本機開發用，只在 localhost 生效 |
 
 換模型後，已快取的要點底稿不會自動重算；要重算可執行：
 `npx wrangler d1 execute goodreader-db --remote --command "DELETE FROM article_keypoints"`
@@ -100,14 +105,44 @@ npm test                          # 評分邏輯、大綱轉換、收集器抽�
 
 ## 新增文章
 
-編輯 `data/classics.json`，然後：
+用後台「範文」頁：AI 撰寫、手動新增、或貼 JSON 批次匯入（格式同 `data/classics.json`）。新文章都是「待審」，審稿老師檢查過按「審核通過並上架」後學生才看得到。
 
-```bash
-node scripts/build-seed.mjs        # 重新產生 migrations/0002_seed_classics.sql
-npx wrangler d1 execute goodreader-db --remote --file migrations/0002_seed_classics.sql
-```
+> 內建文章是手動輸入的，正式使用前請與權威版本校對一次（後台可直接修改）。
 
-> 內建文章是手動輸入的，正式使用前請與權威版本校對一次。
+## 後台（/admin）
+
+| 頁面 | 誰能用 | 功能 |
+| --- | --- | --- |
+| 使用與成本 | 管理者 | 每日評分次數、活躍學生、新帳號、各模型 tokens 與估算成本、每次評分成本、月成本推估、模型單價設定 |
+| 帳戶 | 管理者 | 搜尋學生、看練習與扣除紀錄、重設 PIN、清除家長 PIN、登出所有裝置、停用／啟用 |
+| 範文 | 管理者、審稿老師 | 列表（待審／上架／下架）、AI 撰寫、手動新增、JSON 匯入、編輯、預覽、產生要點底稿檢查、上架／下架 |
+| 權限 | 管理者 | 加入審稿老師或其他管理者、操作紀錄 |
+
+- 只有「已上架」的文章會出現在學生端；學生做過的文章不能刪，只能下架。
+- 改了正文會自動清掉要點底稿，下次評分重算。
+- 成本以後台設定的單價估算（預設 DeepInfra 2026-09 公告價：V4-Flash 輸入 $0.09／輸出 $0.18，V4-Pro $1.30／$2.60，每百萬 tokens），實際以 DeepInfra 帳單為準。
+
+### 設定 Cloudflare Access（後台登入）
+
+後台用 Cloudflare Access 寄 email 一次性驗證碼登入，程式不存任何後台密碼。
+
+1. Cloudflare dashboard → **Zero Trust**（第一次會請你取團隊名稱、選 Free 方案）。
+2. **Settings → Authentication → Login methods**：確認有 **One-time PIN**。
+3. **Access → Applications → Add an application → Self-hosted**：
+   - Application name：`GoodReader 後台`
+   - Destinations：`goodreader.gkb4u.com` 路徑 `admin`，再加一筆路徑 `api/admin`（兩個都要）
+   - Session duration：24 hours
+4. Policy：Action **Allow**，Include → **Emails**，填入管理者與審稿老師的 email。
+5. 存檔後在應用程式的 **Overview** 複製 **Application Audience (AUD) Tag**。
+6. Workers & Pages → goodreader → **Settings → Variables and Secrets**，新增三個 **Secret**：
+   - `ACCESS_TEAM_DOMAIN`：`<團隊名稱>.cloudflareaccess.com`
+   - `ACCESS_AUD`：上一步的 AUD Tag
+   - `ADMIN_EMAILS`：你的 email（逗號分隔可放多個）
+7. 開 `https://goodreader.gkb4u.com/admin`，輸入 email、收驗證碼登入。
+
+之後要加審稿老師：Access policy 加上老師的 email，再到後台「權限」頁把他設成審稿老師（兩道鎖：Access 管能不能登入，後台名單管能做什麼）。
+
+`*.workers.dev` 網址沒有經過 Access，後台 API 會一律拒絕，不會外洩。
 
 ## 目錄
 
@@ -120,13 +155,15 @@ app/                     頁面與 API 路由
   login/page.tsx         登入／建立帳號
   api/auth/…             註冊、登入、登出、目前使用者
   api/me/…               學習概況、積分扣除
-  api/admin/…            試抓白名單網址、重設 PIN
+  admin/…                後台頁面（使用與成本、帳戶、範文、權限）
+  api/admin/…            後台 API（Cloudflare Access 驗證）
 lib/
   grader.ts  prompts.ts  llm.ts   評分流程、提示詞、DeepInfra 呼叫
   rubric.ts  textcheck.ts         配分、抄錄偵測、前檢查
   collector.ts                    白名單收集器
   db.ts                           D1 存取
   auth.ts                         帳號、PIN 雜湊、登入狀態、錯誤鎖定
+  admin.ts  admin-db.ts           後台身分（Access JWT）、後台查詢
 migrations/                       D1 schema 與經典文章種子資料
 data/classics.json                內建文章原始資料
 ```
@@ -138,19 +175,10 @@ data/classics.json                內建文章原始資料
 - 同一暱稱 15 分鐘內 PIN 錯 5 次會暫停登入；家長 PIN 也一樣。
 - 每次練習取最高分計入積分（重交不會重複加分）；剩餘積分 = 總積分 − 已扣除。
 - 「扣除」需要家長 PIN：帳號第一次扣除時由家長設定（不能和學生 PIN 相同），之後每次扣除都要輸入。
-- 忘記 PIN（需先設定 `ADMIN_TOKEN` secret）：
-
-```bash
-# 重設學生 PIN（同時登出所有裝置）
-curl -X POST https://goodreader.gkb4u.com/api/admin/reset-pin \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" -H "Content-Type: application/json" \
-  -d '{"nickname":"小明","pin":"1234"}'
-# 清除家長 PIN（下次扣除時重新設定）
-curl ... -d '{"nickname":"小明","clearParentPin":true}'
-```
+- 忘記 PIN、忘記家長 PIN、要停用帳號：在後台「帳戶」頁處理。
 
 ## Demo 還沒做的
 
-- 家長／教師端介面（目前重設 PIN 只能用管理端 API）
+- 付費機制（綠界 ECPay 點數包）
 - 白名單來源、R2 快照、每日清理排程
 - 教師端（第二階段）

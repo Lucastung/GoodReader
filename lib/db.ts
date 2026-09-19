@@ -45,8 +45,12 @@ const ARTICLE_COLS =
 /** 年級對應的難度範圍 */
 export const DIFFICULTY_RANGE: Record<Grade, [number, number]> = { junior: [1, 3], senior: [3, 5] };
 
-export async function getArticle(db: D1Database, id: string): Promise<Article | null> {
-  const r = await db.prepare(`SELECT ${ARTICLE_COLS} FROM articles WHERE id = ?`).bind(id).first<ArticleRow>();
+/** 取文章。onlyApproved = 學生端開新練習時用，只給審核通過的 */
+export async function getArticle(db: D1Database, id: string, onlyApproved = false): Promise<Article | null> {
+  const r = await db
+    .prepare(`SELECT ${ARTICLE_COLS} FROM articles WHERE id = ?${onlyApproved ? " AND status = 'approved'" : ""}`)
+    .bind(id)
+    .first<ArticleRow>();
   return r ? toArticle(r) : null;
 }
 
@@ -58,7 +62,7 @@ export async function pickArticle(
 ): Promise<Article | null> {
   const [lo, hi] = DIFFICULTY_RANGE[grade];
   const tries: [string, unknown[]][] = [];
-  const genreSql = genre ? " AND genre = ?" : "";
+  const genreSql = (genre ? " AND genre = ?" : "") + " AND status = 'approved'";
   const genreArgs = genre ? [genre] : [];
   const excl = excludeIds.length ? ` AND id NOT IN (${excludeIds.map(() => "?").join(",")})` : "";
   // 先照年級難度 + 排除最近做過的；找不到再逐步放寬
@@ -77,7 +81,7 @@ export async function pickArticle(
 
 export async function listArticles(db: D1Database) {
   const { results } = await db
-    .prepare("SELECT id, title, author, era, genre, difficulty, char_count FROM articles ORDER BY difficulty, title")
+    .prepare("SELECT id, title, author, era, genre, difficulty, char_count FROM articles WHERE status = 'approved' ORDER BY difficulty, title")
     .all<{ id: string; title: string; author: string; era: string | null; genre: string; difficulty: number; char_count: number }>();
   return results;
 }
@@ -222,5 +226,15 @@ export async function addRedemption(db: D1Database, clientId: string, points: nu
   await db
     .prepare("INSERT INTO redemptions (id, client_id, points) VALUES (?, ?, ?)")
     .bind(crypto.randomUUID(), clientId, points)
+    .run();
+}
+
+export async function logUsage(
+  db: D1Database,
+  u: { kind: "keypoints" | "generate"; model: string; articleId?: string | null; tokensIn: number; tokensOut: number; latencyMs: number },
+) {
+  await db
+    .prepare("INSERT INTO llm_usage (id, kind, model, article_id, tokens_in, tokens_out, latency_ms) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(crypto.randomUUID(), u.kind, u.model, u.articleId ?? null, u.tokensIn, u.tokensOut, u.latencyMs)
     .run();
 }
