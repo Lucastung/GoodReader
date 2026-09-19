@@ -35,11 +35,29 @@ function chunk(text: string): string[] {
 
 export type ReadState = "idle" | "playing" | "paused";
 
+const NOTICE_KEY = "rd.ttsNoticeSeen";
+function noticeSeen() {
+  try {
+    return localStorage.getItem(NOTICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function markNoticeSeen() {
+  try {
+    localStorage.setItem(NOTICE_KEY, "1");
+  } catch {
+    /* 無痕模式等情況忽略，下次會再提醒一次 */
+  }
+}
+
 export function useReadAloud(paragraphs: Paragraph[], title?: string) {
   const [supported, setSupported] = useState(false);
   const [state, setState] = useState<ReadState>("idle");
   const [current, setCurrent] = useState<string | null>(null);
   const [rate, setRate] = useState(1);
+  /** 第一次朗讀前先顯示提醒；值為要開始的段落（"" 代表從頭） */
+  const [pendingNotice, setPendingNotice] = useState<string | null>(null);
   const runId = useRef(0);
 
   useEffect(() => {
@@ -57,7 +75,7 @@ export function useReadAloud(paragraphs: Paragraph[], title?: string) {
     setCurrent(null);
   }, []);
 
-  const play = useCallback(
+  const start = useCallback(
     (fromId?: string) => {
       const synth = window.speechSynthesis;
       synth.cancel();
@@ -94,6 +112,27 @@ export function useReadAloud(paragraphs: Paragraph[], title?: string) {
     [paragraphs, title, rate],
   );
 
+  /** 對外的「開始朗讀」：第一次會先顯示讀音提醒 */
+  const play = useCallback(
+    (fromId?: string) => {
+      if (!noticeSeen()) {
+        setPendingNotice(fromId ?? "");
+        return;
+      }
+      start(fromId);
+    },
+    [start],
+  );
+
+  const acceptNotice = useCallback(() => {
+    markNoticeSeen();
+    const from = pendingNotice;
+    setPendingNotice(null);
+    start(from || undefined);
+  }, [pendingNotice, start]);
+
+  const dismissNotice = useCallback(() => setPendingNotice(null), []);
+
   const pause = useCallback(() => {
     window.speechSynthesis.pause();
     setState("paused");
@@ -103,13 +142,45 @@ export function useReadAloud(paragraphs: Paragraph[], title?: string) {
     setState("playing");
   }, []);
 
-  return { supported, state, current, rate, setRate, play, pause, resume, stop };
+  return {
+    supported,
+    state,
+    current,
+    rate,
+    setRate,
+    play,
+    pause,
+    resume,
+    stop,
+    showNotice: pendingNotice !== null,
+    acceptNotice,
+    dismissNotice,
+  };
 }
 
 /** 閱讀區上方的朗讀控制列 */
 export function ReadAloudBar({ ctl }: { ctl: ReturnType<typeof useReadAloud> }) {
   if (!ctl.supported) return null;
   return (
+    <>
+    {ctl.showNotice && (
+      <div className="tts-notice" role="alertdialog" aria-labelledby="tts-notice-title">
+        <p id="tts-notice-title">
+          <b>朗讀使用手機或電腦內建的語音功能</b>
+        </p>
+        <p className="small">
+          內建語音不是專為國文設計，某些字（特別是文言文的破音字、古音）讀音可能有錯，請以課本或字典為準。
+        </p>
+        <div className="tts-notice-actions">
+          <button className="primary small-btn" onClick={ctl.acceptNotice}>
+            知道了，開始朗讀
+          </button>
+          <button className="ghost small-btn" onClick={ctl.dismissNotice}>
+            先不要
+          </button>
+        </div>
+      </div>
+    )}
     <div className="read-aloud" role="group" aria-label="朗讀全文">
       {ctl.state === "idle" && (
         <button className="primary small-btn" onClick={() => ctl.play()}>
@@ -145,6 +216,7 @@ export function ReadAloudBar({ ctl }: { ctl: ReturnType<typeof useReadAloud> }) 
       </select>
       <span className="muted small">點段落編號可從那段開始讀</span>
     </div>
+    </>
   );
 }
 

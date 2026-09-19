@@ -278,3 +278,10 @@ button.pid:hover { border-color: var(--accent); color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .mic.on { animation: none; } }
 .field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .field-head h2 { margin-bottom: 0.2rem; }
+.tts-notice {
+  margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+  background: var(--accent-soft); border: 1px solid var(--accent);
+}
+.tts-notice p { margin: 0 0 4px; }
+.tts-notice-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.tts-notice-actions .ghost { margin-top: 0; }
