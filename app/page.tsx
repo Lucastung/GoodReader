@@ -92,6 +92,16 @@ export default function Home() {
         </p>
       </section>
 
+      <section className="card demo-entry">
+        <p>
+          <b>第一次使用？</b>
+          <span className="muted"> 用〈桃花源記〉走一遍：開文章、列大綱、寫摘要、看評分。</span>
+        </p>
+        <a className="primary as-button" href="/demo">
+          看互動示範
+        </a>
+      </section>
+
       <section className="card">
         <div className="field">
           <span className="label">年級</span>

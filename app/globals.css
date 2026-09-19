@@ -144,7 +144,51 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 .tree { padding-left: 1.2em; margin: 4px 0; }
 .actions { margin-top: 16px; }
 
+/* 互動示範 */
+.demo { padding-bottom: 8px; }
+.stepper { display: flex; gap: 6px; flex-wrap: wrap; }
+.stepper button {
+  display: inline-flex; align-items: center; gap: 6px; background: var(--surface); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 99px; padding: 5px 12px 5px 6px;
+}
+.stepper button:disabled { opacity: 0.6; }
+.stepper .n {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--line); color: var(--text); font-size: 0.8rem; font-weight: 700;
+}
+.stepper button.on { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.stepper button.on .n { background: var(--accent); color: #fff; }
+.stepper button.done .n { background: var(--accent-soft); color: var(--accent); }
+.coach { position: sticky; top: 8px; z-index: 5; border-color: var(--accent); box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
+.coach h2 { margin: 0 0 4px; font-size: 1.05rem; color: var(--accent); }
+.coach h3 { margin: 6px 0 2px; }
+.coach p, .coach ul { margin: 4px 0; }
+.coach ul { padding-left: 1.2em; }
+.coach-actions, .coach-foot { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.coach-foot { justify-content: space-between; border-top: 1px solid var(--line); padding-top: 10px; }
+.coach-actions .ghost, .coach-foot .ghost { margin-top: 0; }
+.as-button { display: inline-block; text-decoration: none; }
+kbd { font: 0.8rem var(--sans); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--bg); }
+.block { border-radius: 12px; transition: box-shadow 0.3s, background 0.3s; }
+.spot { box-shadow: 0 0 0 3px var(--accent); background: var(--accent-soft); }
+.card.spot { background: var(--surface); }
+.answer .block + .block { margin-top: 8px; }
+.answer .block.spot, .result .spot { padding: 6px 10px; }
+.meter-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+.meter-row .count { margin: 0; }
+.copy-meter { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
+.copy-meter .bar { position: relative; width: 110px; margin: 0; }
+.copy-meter .bar div { background: var(--lv-a); }
+.copy-meter.bad { color: var(--lv-d); }
+.copy-meter.bad .bar div { background: var(--lv-d); }
+.copy-meter .bar i { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); }
+.small-seg button { padding: 5px 10px; font-size: 0.85rem; }
+.demo-entry { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.demo-entry p { margin: 0; }
+
 @media (max-width: 820px) {
+  .coach { position: fixed; top: auto; bottom: 0; left: 0; right: 0; border-radius: 14px 14px 0 0; max-height: 46vh; overflow: auto; }
+  .demo { padding-bottom: 48vh; }
   .work { grid-template-columns: 1fr; }
   .reader { position: static; max-height: none; }
   .text { font-size: 1.05rem; }
