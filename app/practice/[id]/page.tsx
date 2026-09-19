@@ -13,6 +13,8 @@ type SessionData = {
   grade: "junior" | "senior";
   article: Article;
   summaryRange: [number, number];
+  /** 之前其他次練習這篇的最高分；null = 第一次做 */
+  previousBest: number | null;
 };
 
 const NO_PARAGRAPHS: Article["paragraphs"] = [];
@@ -117,6 +119,11 @@ export default function PracticePage() {
 
   return (
     <div className="practice">
+      {data.previousBest != null && (
+        <p className="redo-note">
+          ✓ 你之前評過這篇（最高 {data.previousBest} 分）。每篇只計分一次，重做不會重複加分；這次如果超過 {data.previousBest} 分，只補上差額。
+        </p>
+      )}
       <div className="work">
       <article className={`reader card ${hideArticle ? "collapsed" : ""}`}>
         <div className="reader-head">

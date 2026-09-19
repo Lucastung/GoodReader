@@ -115,7 +115,7 @@ export default function TextsPage() {
               <th className="num">字數</th>
               <th>狀態</th>
               <th>來源</th>
-              <th className="num">練習次數</th>
+              <th className="num">練習學生數</th>
               <th className="num">平均最高分</th>
               <th>更新</th>
             </tr>

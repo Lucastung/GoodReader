@@ -6,7 +6,7 @@ import { ApiError, api, getPref, setAccessCode, setPref } from "@/lib/client";
 import type { Stats } from "@/lib/db";
 
 type Me = { id: string; nickname: string; hasParentPin: boolean } | null;
-type ArticleItem = { id: string; title: string; author: string; era: string | null; genre: string; difficulty: number; char_count: number };
+type ArticleItem = { id: string; title: string; author: string; era: string | null; genre: string; difficulty: number; char_count: number; best: number | null };
 
 const GENRE_OPTIONS = ["全部", "文言文", "散文", "記敘文"];
 
@@ -150,8 +150,15 @@ export default function Home() {
         <ul className="article-list">
           {shown.map((a) => (
             <li key={a.id}>
-              <button className="article-item" disabled={busy} onClick={() => start(a.id)}>
-                <span className="title">{a.title}</span>
+              <button className={`article-item ${a.best != null ? "done" : ""}`} disabled={busy} onClick={() => start(a.id)}>
+                <span className="title">
+                  {a.title}
+                  {a.best != null && (
+                    <span className="done-mark" title="已評過，積分以這篇的最高分計，重做不會重複加分">
+                      ✓ 已評 {a.best} 分
+                    </span>
+                  )}
+                </span>
                 <span className="meta">
                   {a.era}・{a.author}・{a.genre}・約 {a.char_count} 字
                 </span>

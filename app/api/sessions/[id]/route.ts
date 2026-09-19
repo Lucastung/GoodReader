@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getArticle, getSession, listAttempts } from "@/lib/db";
+import { getArticle, getSession, listAttempts, previousBest } from "@/lib/db";
 import { checkAccess, cfEnv, jsonError, requireUser } from "@/lib/http";
 import { suggestedSummaryRange } from "@/lib/textcheck";
 
@@ -24,5 +24,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     article,
     summaryRange: suggestedSummaryRange(article.charCount),
     attempts: await listAttempts(env.DB, id),
+    previousBest: await previousBest(env.DB, clientId, session.article_id, session.id),
   });
 }

@@ -23,9 +23,9 @@ export async function listUsers(db: D1Database, q: string, limit: number, offset
     db
       .prepare(
         `WITH best AS (
-           SELECT s.client_id, s.id, MAX(g.total) AS best, MAX(t.submitted_at) AS last
+           SELECT s.client_id, s.article_id, MAX(g.total) AS best, MAX(t.submitted_at) AS last
            FROM sessions s JOIN attempts t ON t.session_id = s.id JOIN grades g ON g.attempt_id = t.id
-           GROUP BY s.id
+           GROUP BY s.client_id, s.article_id
          ),
          agg AS (SELECT client_id, COUNT(*) AS done, SUM(best) AS pts, MAX(last) AS last FROM best GROUP BY client_id),
          red AS (SELECT client_id, SUM(points) AS redeemed FROM redemptions GROUP BY client_id)
@@ -115,8 +115,8 @@ export async function listAdminArticles(db: D1Database, f: { status?: string; q?
   const { results } = await db
     .prepare(
       `WITH best AS (
-         SELECT s.article_id, s.id, MAX(g.total) AS best
-         FROM sessions s JOIN attempts t ON t.session_id = s.id JOIN grades g ON g.attempt_id = t.id GROUP BY s.id
+         SELECT s.article_id, s.client_id, MAX(g.total) AS best
+         FROM sessions s JOIN attempts t ON t.session_id = s.id JOIN grades g ON g.attempt_id = t.id GROUP BY s.article_id, s.client_id
        ),
        agg AS (SELECT article_id, COUNT(*) AS n, AVG(best) AS avg_best FROM best GROUP BY article_id)
        SELECT a.id, a.title, a.author, a.era, a.genre, a.difficulty, a.char_count, a.status, a.origin, a.license,

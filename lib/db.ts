@@ -188,21 +188,21 @@ export type Stats = {
 };
 
 /**
- * 每次練習（session）只取最高分，避免重複送出同一篇來刷分。
- * 總積分 = 各次練習最高分的總和；剩餘 = 總積分 − 已扣除。
+ * 每篇文章只計分一次：取這篇所有練習中的最高分，重做同一篇不會重複加分
+ * （分數進步時只補上差額）。總積分 = 各篇最高分的總和；剩餘 = 總積分 − 已扣除。
  */
 export async function getStats(db: D1Database, clientId: string): Promise<Stats> {
   const [rows, red] = await db.batch([
     db
       .prepare(
         `WITH best AS (
-           SELECT s.id, a.difficulty, MAX(g.total) AS best
+           SELECT s.article_id, a.difficulty, MAX(g.total) AS best
            FROM sessions s
            JOIN articles a ON a.id = s.article_id
            JOIN attempts t ON t.session_id = s.id
            JOIN grades g ON g.attempt_id = t.id
            WHERE s.client_id = ?
-           GROUP BY s.id
+           GROUP BY s.article_id
          )
          SELECT difficulty, COUNT(*) AS n, AVG(best) AS avg, SUM(best) AS total FROM best GROUP BY difficulty`,
       )
@@ -237,4 +237,30 @@ export async function logUsage(
     .prepare("INSERT INTO llm_usage (id, kind, model, article_id, tokens_in, tokens_out, latency_ms) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .bind(crypto.randomUUID(), u.kind, u.model, u.articleId ?? null, u.tokensIn, u.tokensOut, u.latencyMs)
     .run();
+}
+
+/** 這個學生評過的每篇文章的最高分（文章清單打勾用） */
+export async function articleBests(db: D1Database, clientId: string): Promise<Record<string, number>> {
+  const { results } = await db
+    .prepare(
+      `SELECT s.article_id, MAX(g.total) AS best
+       FROM sessions s JOIN attempts t ON t.session_id = s.id JOIN grades g ON g.attempt_id = t.id
+       WHERE s.client_id = ? GROUP BY s.article_id`,
+    )
+    .bind(clientId)
+    .all<{ article_id: string; best: number }>();
+  return Object.fromEntries(results.map((r) => [r.article_id, r.best]));
+}
+
+/** 同一篇文章在「其他」練習裡的最高分（練習頁提醒不會重複計分用） */
+export async function previousBest(db: D1Database, clientId: string, articleId: string, excludeSessionId: string) {
+  const r = await db
+    .prepare(
+      `SELECT MAX(g.total) AS best
+       FROM sessions s JOIN attempts t ON t.session_id = s.id JOIN grades g ON g.attempt_id = t.id
+       WHERE s.client_id = ? AND s.article_id = ? AND s.id != ?`,
+    )
+    .bind(clientId, articleId, excludeSessionId)
+    .first<{ best: number | null }>();
+  return r?.best ?? null;
 }

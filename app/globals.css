@@ -285,3 +285,30 @@ button.pid:hover { border-color: var(--accent); color: var(--accent); }
 .tts-notice p { margin: 0 0 4px; }
 .tts-notice-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .tts-notice-actions .ghost { margin-top: 0; }
+
+/* 已評過的文章 */
+.article-item.done { background: color-mix(in srgb, var(--surface) 85%, var(--lv-a) 15%); }
+.done-mark {
+  display: inline-block; margin-left: 8px; vertical-align: 2px;
+  font-family: var(--sans); font-size: 0.72rem; font-weight: 600; color: var(--lv-a);
+  border: 1px solid var(--lv-a); border-radius: 99px; padding: 0 8px; white-space: nowrap;
+}
+.redo-note { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 0.88rem; }
+
+/* 已評過的文章 */
+.article-item.done { background: color-mix(in srgb, var(--surface) 88%, var(--lv-a) 12%); }
+.done-mark {
+  display: inline-block; margin-left: 8px; vertical-align: 2px;
+  font-family: var(--sans); font-size: 0.72rem; font-weight: 600; color: var(--lv-a);
+  border: 1px solid var(--lv-a); border-radius: 99px; padding: 0 8px; white-space: nowrap;
+}
+.redo-note { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 0.88rem; }
+
+/* 已評過的文章 */
+.article-item.done { background: color-mix(in srgb, var(--surface) 88%, var(--lv-a) 12%); }
+.done-mark {
+  display: inline-block; margin-left: 8px; vertical-align: 2px;
+  font-family: var(--sans); font-size: 0.72rem; font-weight: 600; color: var(--lv-a);
+  border: 1px solid var(--lv-a); border-radius: 99px; padding: 0 8px; white-space: nowrap;
+}
+.redo-note { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 0.88rem; }
