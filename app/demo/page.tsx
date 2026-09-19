@@ -202,7 +202,7 @@ export default function DemoPage() {
         <h2>步驟 2：逐條加大綱</h2>
         <ul>
           <li>一行寫一個重點，按 <kbd>Enter</kbd> 新增下一條。</li>
-          <li>按 <b>→</b>（或 <kbd>Tab</kbd>）把這條變成上一條的細項，<b>←</b> 退回上一層，最多 3 層。</li>
+          <li>按住左邊的 <b>●</b> 往右拉，把這條變成上一條的細項，往左拉退回上一層，最多 3 層；上下拉可以調整順序。電腦上也可以用 <kbd>Tab</kbd>。</li>
           <li>建議第一層寫「段落在做什麼」，第二層寫細節。</li>
           <li>每一條旁邊的 🎤 可以用說的輸入（瀏覽器會先問你能不能用麥克風）。</li>
         </ul>
@@ -357,7 +357,7 @@ export default function DemoPage() {
         <section className="answer card">
           <div id="outline-card" className={`block${step === 1 ? " spot" : ""}`}>
             <h2>大綱</h2>
-            <p className="hint">一行一個重點，用 → ← 調整層級（最多 3 層）。文言文請用白話寫。</p>
+            <p className="hint">一行一個重點。拖左邊的圓點調整層級（最多 3 層）和順序。文言文請用白話寫。</p>
             {step >= 1 ? (
               <OutlineEditor rows={rows} onChange={setRows} />
             ) : (

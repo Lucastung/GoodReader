@@ -160,6 +160,20 @@ select {
 .outline { display: grid; gap: 6px; }
 .outline-row { display: flex; align-items: center; gap: 6px; }
 .bullet { color: var(--accent); font-size: 0.7rem; width: 1em; text-align: center; }
+.handle {
+  flex-shrink: 0; width: 32px; height: 38px; margin-left: -6px; padding: 0; border: 0; border-radius: 8px;
+  background: none; color: var(--accent); font-size: 0.75rem; cursor: grab;
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.handle:hover, .handle:focus-visible { background: var(--accent-soft); }
+.outline-row { transition: padding-left 0.12s ease; }
+.outline-row.dragging { background: var(--accent-soft); border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+.outline-row.dragging .handle { cursor: grabbing; }
+.drag-tip {
+  display: flex; gap: 10px; align-items: center; justify-content: space-between; margin: 0 0 4px;
+  padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 0.85rem;
+}
+.drag-tip .linkish { flex-shrink: 0; }
 .row-tools { display: flex; gap: 2px; }
 .row-tools button { background: none; border: 1px solid var(--line); border-radius: 6px; width: 30px; height: 34px; color: var(--muted); }
 

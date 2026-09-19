@@ -179,7 +179,7 @@ export default function PracticePage() {
       <section className="answer card">
         <h2>大綱</h2>
         <p className="hint">
-          一行一個重點，用 → ← 調整層級（最多 3 層）。{isClassical && "文言文請用白話寫。"}
+          一行一個重點。拖左邊的圓點調整層級（最多 3 層）和順序。{isClassical && "文言文請用白話寫。"}
         </p>
         <OutlineEditor rows={rows} onChange={setRows} />
 

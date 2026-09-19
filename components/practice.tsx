@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GradeResult } from "@/lib/grader";
-import { MAX_LEVEL, normalizeRows, type OutlineRow } from "@/lib/outline";
+import { blockEnd, moveBlock, normalizeRows, shiftBlock, type OutlineRow } from "@/lib/outline";
 import type { OutlineNode } from "@/lib/schemas";
 import { MicButton } from "./speech";
 
@@ -10,13 +10,47 @@ export type AttemptResult = GradeResult & { attemptId: string; readSeconds: numb
 
 export const LEVEL_CLASS: Record<string, string> = { 優: "lv-a", 良: "lv-b", 尚可: "lv-c", 待加強: "lv-d" };
 
+const DRAG_TIP_KEY = "rd.outlineDragTip";
+/** 往左右拖多少像素算一層 */
+const LEVEL_STEP = 28;
+
+type Drag = {
+  pointerId: number;
+  index: number; // 被拖的列目前在第幾列
+  startX: number;
+  startY: number;
+  baseLevel: number; // 開始左右拖時的層級
+  applied: number; // 已套用的層級變化
+  axis: "x" | "y" | null;
+};
+
 export function OutlineEditor({ rows, onChange }: { rows: OutlineRow[]; onChange: (r: OutlineRow[]) => void }) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
+  const rowEls = useRef<(HTMLDivElement | null)[]>([]);
   const [focusIdx, setFocusIdx] = useState<number | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const drag = useRef<Drag | null>(null);
+  const [showTip, setShowTip] = useState(false);
 
   useEffect(() => {
     if (focusIdx != null) refs.current[focusIdx]?.focus();
   }, [focusIdx, rows.length]);
+
+  useEffect(() => {
+    try {
+      setShowTip(localStorage.getItem(DRAG_TIP_KEY) !== "1");
+    } catch {
+      setShowTip(true);
+    }
+  }, []);
+  const hideTip = () => {
+    setShowTip(false);
+    try {
+      localStorage.setItem(DRAG_TIP_KEY, "1");
+    } catch {
+      /* 無痕模式忽略 */
+    }
+  };
 
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
@@ -33,8 +67,12 @@ export function OutlineEditor({ rows, onChange }: { rows: OutlineRow[]; onChange
     if (final) dictBase.current.delete(i);
   };
   const setText = (i: number, text: string) => update(rows.map((r, j) => (j === i ? { ...r, text } : r)));
-  const shift = (i: number, d: number) =>
-    update(rows.map((r, j) => (j === i ? { ...r, level: Math.max(0, Math.min(MAX_LEVEL, r.level + d)) } : r)));
+  const shift = (i: number, d: number) => onChange(shiftBlock(rowsRef.current, i, d));
+  const move = (i: number, dir: -1 | 1) => {
+    const r = moveBlock(rowsRef.current, i, dir);
+    onChange(r.rows);
+    return r.index;
+  };
   const insertAfter = (i: number) => {
     const next = [...rows];
     next.splice(i + 1, 0, { text: "", level: rows[i]?.level ?? 0 });
@@ -47,11 +85,122 @@ export function OutlineEditor({ rows, onChange }: { rows: OutlineRow[]; onChange
     setFocusIdx(Math.max(0, i - 1));
   };
 
+  // ---- 拖拉圓點：左右＝調整層級，上下＝調整順序 ----
+  const onPointerDown = (i: number) => (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = {
+      pointerId: e.pointerId,
+      index: i,
+      startX: e.clientX,
+      startY: e.clientY,
+      baseLevel: rowsRef.current[i].level,
+      applied: 0,
+      axis: null,
+    };
+    setDragIdx(i);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = drag.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.axis) {
+      if (Math.hypot(dx, dy) < 8) return;
+      d.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+      if (d.axis === "x") d.baseLevel = rowsRef.current[d.index].level;
+    }
+    if (d.axis === "x") {
+      const want = Math.round(dx / LEVEL_STEP);
+      if (want !== d.applied) {
+        const next = shiftBlock(rowsRef.current, d.index, want - d.applied);
+        d.applied = next[d.index].level - d.baseLevel;
+        rowsRef.current = next;
+        onChange(next);
+      }
+    } else {
+      // 手指越過上一列／下一列的中線就換位置
+      let idx = d.index;
+      for (let guard = 0; guard < 50; guard++) {
+        const cur = rowsRef.current;
+        const above = rowEls.current[idx - 1]?.getBoundingClientRect();
+        const endIdx = blockEnd(cur, idx);
+        const below = rowEls.current[endIdx]?.getBoundingClientRect();
+        let dir: -1 | 1 | 0 = 0;
+        if (above && idx > 0 && e.clientY < above.top + above.height / 2) dir = -1;
+        else if (below && endIdx < cur.length && e.clientY > below.top + below.height / 2) dir = 1;
+        if (!dir) break;
+        const r = moveBlock(cur, idx, dir);
+        if (r.index === idx) break;
+        rowsRef.current = r.rows;
+        idx = r.index;
+      }
+      if (idx !== d.index) {
+        d.index = idx;
+        setDragIdx(idx);
+        onChange(rowsRef.current);
+      }
+    }
+  };
+
+  const endDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = drag.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    if (d.axis) hideTip(); // 會拖了就不用再提示
+    else refs.current[d.index]?.focus(); // 只是點一下：把游標移到那一條
+    drag.current = null;
+    setDragIdx(null);
+  };
+
+  /** 圓點也能用鍵盤：← → 調層級、↑ ↓ 調順序 */
+  const onHandleKey = (i: number) => (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const k = e.key;
+    if (k === "ArrowRight" || k === "ArrowLeft") {
+      e.preventDefault();
+      shift(i, k === "ArrowRight" ? 1 : -1);
+    } else if (k === "ArrowUp" || k === "ArrowDown") {
+      e.preventDefault();
+      const to = move(i, k === "ArrowUp" ? -1 : 1);
+      requestAnimationFrame(() => rowEls.current[to]?.querySelector<HTMLButtonElement>(".handle")?.focus());
+    }
+  };
+
   return (
     <div className="outline">
+      {showTip && (
+        <p className="drag-tip">
+          <span>
+            按住左邊的 <b>●</b> 往右拉，變成上一條的細項；往左拉退回。上下拉可以調整順序。
+          </span>
+          <button type="button" className="linkish" onClick={hideTip}>
+            知道了
+          </button>
+        </p>
+      )}
       {rows.map((r, i) => (
-        <div key={i} className="outline-row" style={{ paddingLeft: `${r.level * 1.5}rem` }}>
-          <span className="bullet">{["●", "○", "▪"][r.level]}</span>
+        <div
+          key={i}
+          ref={(el) => {
+            rowEls.current[i] = el;
+          }}
+          className={`outline-row${dragIdx === i ? " dragging" : ""}`}
+          style={{ paddingLeft: `${r.level * 1.5}rem` }}
+        >
+          <button
+            type="button"
+            className="handle"
+            aria-label={`第 ${i + 1} 條，第 ${r.level + 1} 層。拖曳或用方向鍵調整層級與順序`}
+            title="按住拖曳：左右調層級、上下調順序"
+            onPointerDown={onPointerDown(i)}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onKeyDown={onHandleKey(i)}
+          >
+            {["●", "○", "▪"][r.level]}
+          </button>
           <input
             ref={(el) => {
               refs.current[i] = el;
@@ -76,12 +225,6 @@ export function OutlineEditor({ rows, onChange }: { rows: OutlineRow[]; onChange
           />
           <div className="row-tools">
             <MicButton onText={(t, f) => dictate(i, t, f)} label={`語音輸入第 ${i + 1} 條`} />
-            <button type="button" onClick={() => shift(i, -1)} disabled={r.level === 0} aria-label="往外一層">
-              ←
-            </button>
-            <button type="button" onClick={() => shift(i, 1)} disabled={r.level >= MAX_LEVEL || i === 0} aria-label="往內一層">
-              →
-            </button>
             <button type="button" onClick={() => remove(i)} aria-label="刪除">
               ×
             </button>

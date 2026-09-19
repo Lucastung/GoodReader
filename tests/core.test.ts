@@ -105,3 +105,31 @@ test("收集器：白名單網域判斷與正文抽取", () => {
   const e2 = extractArticle(html, { domain: "example.org" }, "https://example.org/taohua");
   assert.ok(e2.paragraphs.length >= 5, `readability 抽到 ${e2.paragraphs.length} 段`);
 });
+
+import { blockEnd, moveBlock, shiftBlock } from "../lib/outline.ts";
+
+test("大綱拖拉：整塊縮排、整塊上下移", () => {
+  const rows = [
+    { text: "A", level: 0 },
+    { text: "A1", level: 1 },
+    { text: "B", level: 0 },
+    { text: "B1", level: 1 },
+    { text: "C", level: 0 },
+  ];
+  assert.equal(blockEnd(rows, 0), 2);
+  assert.equal(blockEnd(rows, 4), 5);
+  // B 連同 B1 變成 A 的細項
+  assert.deepEqual(shiftBlock(rows, 2, 1).map((r) => r.level), [0, 1, 1, 2, 0]);
+  // 第一列不能縮排
+  assert.deepEqual(shiftBlock(rows, 0, 1).map((r) => r.level), [0, 1, 0, 1, 0]);
+  // B 整塊往上移到 A 前面
+  const up = moveBlock(rows, 2, -1);
+  assert.equal(up.index, 1);
+  assert.deepEqual(up.rows.map((r) => r.text), ["A", "B", "B1", "A1", "C"]);
+  // A 整塊往下移一格（跳過 B）
+  const down = moveBlock(rows, 0, 1);
+  assert.deepEqual(down.rows.map((r) => r.text), ["B", "A", "A1", "B1", "C"]);
+  // 邊界不動
+  assert.equal(moveBlock(rows, 0, -1).index, 0);
+  assert.equal(moveBlock(rows, 4, 1).index, 4);
+});
