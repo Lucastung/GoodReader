@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { computeScores, WEIGHTS } from "../lib/rubric.ts";
-import { ngramCopyRatio, precheck, countHan, suggestedSummaryRange } from "../lib/textcheck.ts";
+import { copyRatio, copyLevel, precheck, countHan, suggestedSummaryRange } from "../lib/textcheck.ts";
 import { rowsToTree, normalizeRows, treeToRows } from "../lib/outline.ts";
 import { extractJson } from "../lib/llm.ts";
 import { LlmGradeSchema, KeypointsSchema } from "../lib/schemas.ts";
@@ -38,11 +38,38 @@ test("全部「優」= 100 分；照抄時精簡項強制降為待加強", () =>
   assert.equal(copied.total, 100 - 18 + 5);
 });
 
-test("重疊率：照抄原文接近 1，自己的話接近 0", () => {
+test("照抄偵測：原文接近 1，自己的話接近 0", () => {
   const copied = "晉太元中，武陵人捕魚為業。緣溪行，忘路之遠近。忽逢桃花林";
   const own = "一個漁夫意外走進與世隔絕的村莊，村民熱情招待，但他出來後再也找不到路。";
-  assert.ok(ngramCopyRatio(copied, taohuaText) > 0.9);
-  assert.ok(ngramCopyRatio(own, taohuaText) < 0.1);
+  assert.ok(copyRatio(copied, taohuaText) > 0.9);
+  assert.ok(copyRatio(own, taohuaText) < 0.1);
+  assert.equal(copyLevel(copyRatio(own, taohuaText)), "low");
+});
+
+test("照抄偵測：在原句增字、刪字、換字仍抓得到", () => {
+  const src = [...taohuaText.replace(/[^\p{Script=Han}]/gu, "").slice(0, 90)];
+  const insert = (k: number) => src.map((c, i) => ((i + 1) % k === 0 ? c + "了" : c)).join("");
+  const remove = (k: number) => src.filter((_, i) => (i + 1) % k !== 0).join("");
+  const swap = (k: number) => src.map((c, i) => ((i + 1) % k === 0 ? "的" : c)).join("");
+  for (const [name, text] of [
+    ["每 4 字插 1 字", insert(4)],
+    ["每 2 字插 1 字", insert(2)],
+    ["每 5 字刪 1 字", remove(5)],
+    ["每 3 字刪 1 字", remove(3)],
+    ["每 4 字換 1 字", swap(4)],
+  ] as const) {
+    assert.ok(copyRatio(text, taohuaText) > 0.9, name);
+    assert.equal(copyLevel(copyRatio(text, taohuaText)), "high", name);
+  }
+});
+
+test("照抄偵測：好好改寫的摘要不會誤判", () => {
+  const good =
+    "東晉時一個武陵漁夫順著溪水划船，意外發現一片桃花林和一座山洞。穿過山洞，他看見一個和平富足的村落，村民的祖先為了躲避秦朝戰亂搬來這裡，從此和外界隔絕。漁夫受到熱情款待，離開時沿路做了記號，但太守派人去找卻迷了路。作者藉此寄託對理想社會的嚮往。";
+  assert.ok(copyRatio(good, taohuaText) < 0.15);
+  // 只引用一小句原文：算「部分」而不是「照抄」
+  const partly = "一個漁夫沿著溪走，看到芳草鮮美，落英繽紛的桃花林，進入一個與世隔絕的村子，村民熱情招待他。他回去後帶太守一起去找，卻再也找不到路。";
+  assert.notEqual(copyLevel(copyRatio(partly, taohuaText)), "high");
 });
 
 test("前檢查：大綱太少或摘要太短會退回", () => {

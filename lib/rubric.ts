@@ -73,7 +73,7 @@ export type ScoreItem = {
 };
 
 export type ComputeOptions = {
-  /** 摘要與原文的 5-gram 重疊率（0..1） */
+  /** 摘要照抄原文的比例（0..1，見 textcheck.copyRatio） */
   copyRatio: number;
 };
 
@@ -88,7 +88,7 @@ export function computeScores(llm: LlmGrade, grade: Grade, opts: ComputeOptions)
     let reason = s?.reason ?? "（模型未提供）";
     if (criterion === "summary_concision" && opts.copyRatio > COPY_THRESHOLD) {
       level = "待加強";
-      reason = `摘要與原文重疊率 ${Math.round(opts.copyRatio * 100)}%，視為照抄。` + reason;
+      reason = "摘要大部分照抄原文（在原句增減幾個字也算），視為照抄。" + reason;
     }
     const max = weights[criterion];
     return {

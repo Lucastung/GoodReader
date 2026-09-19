@@ -88,7 +88,7 @@ ${student.outlineText}
 ${student.summary}
 </student_answer>
 
-程式預先算出：摘要與原文的 5 字重疊率為 ${Math.round(student.copyRatio * 100)}%（超過 60% 視為照抄）。
+程式預先比對：摘要${student.copyRatio > 0.6 ? "大部分照抄原文" : student.copyRatio >= 0.25 ? "有部分句子和原文幾乎一樣（可能只增減或替換了幾個字）" : "大多是自己的話"}。只在理由裡用文字描述，不要寫出百分比或數字。
 ${isClassical ? "這是文言文：學生必須用白話寫。可引用人名、典故等關鍵字詞，但整句照抄文言原文視同抄錄，「精簡與轉述」從嚴。\n" : ""}
 評分標準（每一項只選等級，不要給分數）：
 ${rubric}

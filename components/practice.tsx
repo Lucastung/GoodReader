@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { GradeResult } from "@/lib/grader";
 import { blockEnd, moveBlock, normalizeRows, shiftBlock, type OutlineRow } from "@/lib/outline";
 import type { OutlineNode } from "@/lib/schemas";
+import { COPY_LEVEL_TEXT } from "@/lib/textcheck";
 import { MicButton } from "./speech";
 
-export type AttemptResult = GradeResult & { attemptId: string; readSeconds: number; tokens?: number };
+export type AttemptResult = Omit<GradeResult, "copyRatio"> & { attemptId: string; readSeconds: number; tokens?: number };
 
 export const LEVEL_CLASS: Record<string, string> = { 優: "lv-a", 良: "lv-b", 尚可: "lv-c", 待加強: "lv-d" };
 
@@ -276,7 +277,7 @@ export function ResultView({
         <div className="muted small">
           {grade === "junior" ? "國中" : "高中"}配分：大綱 {outlineMax}、摘要 {100 - outlineMax}
           {history.length > 1 && <div>本篇歷次：{history.join(" → ")}</div>}
-          <div>摘要與原文重疊率 {Math.round(result.copyRatio * 100)}%</div>
+          <div className={result.copyLevel === "high" ? "error" : ""}>{COPY_LEVEL_TEXT[result.copyLevel]}</div>
         </div>
       </div>
 

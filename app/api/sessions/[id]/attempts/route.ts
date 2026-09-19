@@ -61,5 +61,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     },
   );
 
-  return NextResponse.json({ attemptId, readSeconds, tokens, ...result });
+  // 不把精確的照抄比例傳給前端（避免一字一字試到剛好低於門檻）
+  const { copyRatio: _hidden, ...publicResult } = result;
+  void _hidden;
+  return NextResponse.json({ attemptId, readSeconds, tokens, ...publicResult });
 }

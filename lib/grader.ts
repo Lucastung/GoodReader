@@ -4,7 +4,7 @@ import { mockGrade, mockKeypoints } from "./mock";
 import { gradingPrompt, keypointsPrompt } from "./prompts";
 import { computeScores, type ScoreItem } from "./rubric";
 import { KeypointsSchema, LlmGradeSchema, type Grade, type Keypoints, type OutlineNode } from "./schemas";
-import { countOutlineItems, ngramCopyRatio, outlineToText } from "./textcheck";
+import { copyLevel, copyRatio as computeCopyRatio, countOutlineItems, outlineToText, type CopyLevel } from "./textcheck";
 
 export function llmConfig(env: CloudflareEnv): LlmConfig {
   return {
@@ -38,7 +38,9 @@ export async function ensureKeypoints(env: CloudflareEnv, article: Article, forc
 export type GradeResult = {
   total: number;
   items: ScoreItem[];
+  /** 內部用（存資料庫、給模型參考）；回給學生前會拿掉 */
   copyRatio: number;
+  copyLevel: CopyLevel;
   keyPoints: Keypoints["keyPoints"];
   keyPointsHit: string[];
   keyPointsMissed: { id: string; text?: string; paragraph?: string | null; hint: string }[];
@@ -60,7 +62,7 @@ export async function gradeAttempt(
 ): Promise<GradeResult> {
   const kp = await ensureKeypoints(env, article);
   const fullText = article.paragraphs.map((p) => p.text).join("");
-  const copyRatio = ngramCopyRatio(summary, fullText);
+  const copyRatio = computeCopyRatio(summary, fullText);
   const cfg = llmConfig(env);
 
   let llm;
@@ -86,6 +88,7 @@ export async function gradeAttempt(
     total,
     items,
     copyRatio,
+    copyLevel: copyLevel(copyRatio),
     keyPoints: kp.keyPoints,
     keyPointsHit: llm.keyPointsHit,
     // 「漏掉的要點」只給提示，要點原文在前端點「看參考答案」才顯示

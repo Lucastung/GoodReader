@@ -12,10 +12,10 @@ import {
   DEMO_OUTLINE,
   DEMO_SUMMARY,
 } from "@/lib/demo";
-import { COPY_THRESHOLD, computeScores } from "@/lib/rubric";
+import { computeScores } from "@/lib/rubric";
 import type { Grade } from "@/lib/schemas";
 import { rowsToTree, type OutlineRow } from "@/lib/outline";
-import { countOutlineItems, ngramCopyRatio, suggestedSummaryRange } from "@/lib/textcheck";
+import { copyLevel, copyRatio as computeCopyRatio, countOutlineItems, suggestedSummaryRange } from "@/lib/textcheck";
 
 const STEPS = ["開文章", "列大綱", "寫摘要", "看評分"] as const;
 
@@ -23,7 +23,7 @@ const RESULT_TIPS: { key: string; title: string; text: string }[] = [
   {
     key: "total",
     title: "總分與配分",
-    text: "左邊是總分。右邊寫著這個年級的配分：國中大綱占 55、摘要 45；高中反過來重摘要（40 : 60）。在說明卡下方可以切換國中／高中配分，看同一份作答分數怎麼變。「重疊率」是摘要和原文相同字串的比例，超過 60% 會被當成照抄。",
+    text: "左邊是總分。右邊寫著這個年級的配分：國中大綱占 55、摘要 45；高中反過來重摘要（40 : 60）。在說明卡下方可以切換國中／高中配分，看同一份作答分數怎麼變。下面一行會說摘要是不是自己的話；大部分照抄原文時，「精簡與轉述」會直接算待加強。",
   },
   {
     key: "criteria",
@@ -78,7 +78,6 @@ export default function DemoPage() {
   const summaryRange = suggestedSummaryRange(article.charCount);
   const filledRows = rows.filter((r) => r.text.trim()).length;
   const sumChars = hanCount(summary);
-  const copyRatio = ngramCopyRatio(summary, fullText);
 
   useEffect(() => () => {
     if (typingTimer.current) clearInterval(typingTimer.current);
@@ -127,6 +126,7 @@ export default function DemoPage() {
   // ---- 評分 ----
   const result: AttemptResult | null = useMemo(() => {
     if (!graded) return null;
+    const copyRatio = computeCopyRatio(summary, fullText);
     const { items, total } = computeScores(DEMO_LLM_GRADE, grade, { copyRatio });
     const kpText = new Map(DEMO_KEYPOINTS.keyPoints.map((k) => [k.id, k.text]));
     return {
@@ -134,7 +134,7 @@ export default function DemoPage() {
       readSeconds: 0,
       total,
       items,
-      copyRatio,
+      copyLevel: copyLevel(copyRatio),
       keyPoints: DEMO_KEYPOINTS.keyPoints,
       keyPointsHit: DEMO_LLM_GRADE.keyPointsHit,
       keyPointsMissed: DEMO_LLM_GRADE.keyPointsMissed.map((m) => ({ ...m, text: kpText.get(m.id) })),
@@ -151,7 +151,7 @@ export default function DemoPage() {
       rubricVersion: "demo",
       usage: { tokensIn: 0, tokensOut: 0, latencyMs: 0 },
     };
-  }, [graded, grade, copyRatio]);
+  }, [graded, grade, summary, fullText]);
 
   function submit() {
     setGrading(true);
@@ -224,7 +224,7 @@ export default function DemoPage() {
         <ul>
           <li>用自己的話把整篇濃縮成一段，建議 {summaryRange[0]}–{summaryRange[1]} 字。</li>
           <li>第一句最好說出作者想表達什麼，再簡述經過。</li>
-          <li>下方會即時顯示「與原文重疊率」，超過 60% 會被當成照抄。</li>
+          <li>送出後會檢查有沒有照抄原文；在原句裡增減或替換幾個字也算照抄，大部分照抄時「精簡與轉述」會直接算待加強。</li>
         </ul>
         <div className="coach-actions">
           <button className="primary" onClick={() => typeSummary(DEMO_SUMMARY)} disabled={typing}>
@@ -383,17 +383,7 @@ export default function DemoPage() {
             />
             <div className="meter-row">
               <span className={`count ${sumChars > summaryRange[1] ? "over" : ""}`}>{sumChars} 字</span>
-              <span className={`copy-meter ${copyRatio > COPY_THRESHOLD ? "bad" : ""}`}>
-                與原文重疊率 {Math.round(copyRatio * 100)}%
-                <span className="bar">
-                  <div style={{ width: `${Math.min(100, copyRatio * 100)}%` }} />
-                  <i style={{ left: `${COPY_THRESHOLD * 100}%` }} />
-                </span>
-              </span>
             </div>
-            {copyRatio > COPY_THRESHOLD && (
-              <p className="error small">重疊率超過 60%，「精簡與轉述」會直接被評為待加強。試試改用自己的話。</p>
-            )}
           </div>
 
           <div id="submit-card" className={`block${step === 3 && !graded ? " spot" : ""}`}>
