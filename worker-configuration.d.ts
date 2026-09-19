@@ -9,7 +9,7 @@ interface __BaseEnv_CloudflareEnv {
 	KEYPOINT_MODEL: string;
 	RUBRIC_VERSION: string;
 	LLM_MOCK: string;
-	WORKER_SELF_REFERENCE: Fetcher /* reading-demo */;
+	WORKER_SELF_REFERENCE: Fetcher /* goodreader */;
 }
 declare namespace Cloudflare {
 	interface Env extends __BaseEnv_CloudflareEnv {}

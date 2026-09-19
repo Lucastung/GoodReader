@@ -1,23 +1,23 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "reading-demo",
+  "name": "goodreader",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-06-01",
   // global_fetch_strictly_public：fetch 只能連公網，擋掉內網位址（防 SSRF）
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "reading-demo" }],
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "goodreader" }],
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "reading-demo-db",
-      // 執行 `npx wrangler d1 create reading-demo-db` 後把 id 貼到這裡
+      "database_name": "goodreader-db",
+      // 執行 `npx wrangler d1 create goodreader-db` 後把 id 貼到這裡
       "database_id": "REPLACE_WITH_YOUR_D1_ID",
       "migrations_dir": "migrations"
     }
   ],
   // 之後接白名單收集器時再開 R2（存原始 HTML 快照）：
-  // "r2_buckets": [{ "binding": "SNAPSHOTS", "bucket_name": "reading-demo-snapshots" }],
+  // "r2_buckets": [{ "binding": "SNAPSHOTS", "bucket_name": "goodreader-snapshots" }],
   "vars": {
     "LLM_BASE_URL": "https://api.deepinfra.com/v1/openai",
     "GRADER_MODEL": "deepseek-ai/DeepSeek-V4-Flash",

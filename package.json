@@ -1,5 +1,5 @@
 {
-  "name": "reading-demo",
+  "name": "goodreader",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,11 +8,11 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --strict-vars=false --env-interface CloudflareEnv worker-configuration.d.ts",
-    "db:migrate:local": "wrangler d1 migrations apply reading-demo-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply reading-demo-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply goodreader-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply goodreader-db --remote",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "build:cf": "opennextjs-cloudflare build",
-    "deploy:ci": "wrangler d1 migrations apply reading-demo-db --remote && opennextjs-cloudflare deploy"
+    "deploy:ci": "wrangler d1 migrations apply goodreader-db --remote && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

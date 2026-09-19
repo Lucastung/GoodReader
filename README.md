@@ -1,4 +1,4 @@
-# 讀懂一篇｜中文閱讀理解練習（Demo）
+# GoodReader｜讀懂一篇：中文閱讀理解練習（Demo）
 
 學生讀一篇經典文章 → 寫大綱與摘要 → DeepSeek（經 DeepInfra）對照原文評分並給回饋。
 
@@ -16,7 +16,7 @@ npm install
 npx wrangler login
 
 # 1. 建立 D1，把輸出的 database_id 貼到 wrangler.jsonc
-npx wrangler d1 create reading-demo-db
+npx wrangler d1 create goodreader-db
 
 # 2. 建資料表並匯入經典文章
 npm run db:migrate:remote
@@ -32,7 +32,7 @@ npx wrangler secret put DEMO_ACCESS_CODE
 npx wrangler secret put ADMIN_TOKEN
 ```
 
-部署完 wrangler 會印出 `https://reading-demo.<你的子網域>.workers.dev`。要掛自己的網域，在 Cloudflare 後台 Workers → reading-demo → Settings → Domains & Routes 加上即可。
+部署完 wrangler 會印出 `https://goodreader.<你的子網域>.workers.dev`。要掛自己的網域，在 Cloudflare 後台 Workers → goodreader → Settings → Domains & Routes 加上即可。
 
 打包後的程式約 1.2 MiB（gzip），Free 方案的大小限制放得下；之後接上收集器（Readability 解析較耗 CPU）建議改用 Workers Paid。
 
@@ -40,10 +40,10 @@ npx wrangler secret put ADMIN_TOKEN
 
 推到 `main` 就自動建置、跑 D1 migration、部署。
 
-1. 先在 Cloudflare 建好 D1（dashboard 的 Storage & Databases → D1，或 `npx wrangler d1 create reading-demo-db`），把 database_id 填進 `wrangler.jsonc` 並 commit。
+1. 先在 Cloudflare 建好 D1（dashboard 的 Storage & Databases → D1，或 `npx wrangler d1 create goodreader-db`），把 database_id 填進 `wrangler.jsonc` 並 commit。
 2. Cloudflare dashboard → **Workers & Pages** → **Create application** → **Import a repository** → 選這個 repo。
 3. 設定：
-   - Project name / Worker 名稱：`reading-demo`（必須和 `wrangler.jsonc` 的 `name` 一致）
+   - Project name / Worker 名稱：`goodreader`（必須和 `wrangler.jsonc` 的 `name` 一致）
    - Build command：`npm run build:cf`
    - Deploy command：`npm run deploy:ci`（先套用 D1 migration 再部署）
    - Production branch：`main`
@@ -76,7 +76,7 @@ npm test                          # 評分邏輯、大綱轉換、收集器抽�
 | `ADMIN_TOKEN` | secret | 選用，`POST /api/admin/collector-test` 用 |
 
 換模型後，已快取的要點底稿不會自動重算；要重算可執行：
-`npx wrangler d1 execute reading-demo-db --remote --command "DELETE FROM article_keypoints"`
+`npx wrangler d1 execute goodreader-db --remote --command "DELETE FROM article_keypoints"`
 
 ## 評分怎麼算
 
@@ -102,7 +102,7 @@ npm test                          # 評分邏輯、大綱轉換、收集器抽�
 
 ```bash
 node scripts/build-seed.mjs        # 重新產生 migrations/0002_seed_classics.sql
-npx wrangler d1 execute reading-demo-db --remote --file migrations/0002_seed_classics.sql
+npx wrangler d1 execute goodreader-db --remote --file migrations/0002_seed_classics.sql
 ```
 
 > 內建文章是手動輸入的，正式使用前請與權威版本校對一次。
