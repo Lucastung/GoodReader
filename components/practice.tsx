@@ -6,7 +6,7 @@ import { blockEnd, moveBlock, normalizeRows, shiftBlock, type OutlineRow } from 
 import type { OutlineNode } from "@/lib/schemas";
 import { MicButton } from "./speech";
 
-export type AttemptResult = GradeResult & { attemptId: string; readSeconds: number };
+export type AttemptResult = GradeResult & { attemptId: string; readSeconds: number; tokens?: number };
 
 export const LEVEL_CLASS: Record<string, string> = { 優: "lv-a", 良: "lv-b", 尚可: "lv-c", 待加強: "lv-d" };
 

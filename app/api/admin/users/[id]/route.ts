@@ -4,6 +4,8 @@ import { audit } from "@/lib/admin";
 import { userDetail } from "@/lib/admin-db";
 import { PinSchema, clearFailures, getUserRow, hashPin, nicknameKey } from "@/lib/auth";
 import { cfEnv, jsonError, requireAdmin } from "@/lib/http";
+import { removeAvatar } from "@/lib/avatar";
+import { creditTokens, spendTokens } from "@/lib/tokens";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -21,6 +23,12 @@ const Action = z.discriminatedUnion("action", [
   z.object({ action: z.literal("disable") }),
   z.object({ action: z.literal("enable") }),
   z.object({ action: z.literal("logoutAll") }),
+  z.object({ action: z.literal("removeAvatar") }),
+  z.object({
+    action: z.literal("adjustTokens"),
+    amount: z.number().int().refine((n) => n !== 0 && Math.abs(n) <= 10000, "數量要是 ±1～10000"),
+    note: z.string().trim().min(1, "請寫原因").max(100),
+  }),
 ]);
 
 /** 帳戶操作：重設 PIN、清除家長 PIN、停用／啟用、登出所有裝置 */
@@ -56,7 +64,22 @@ export async function POST(req: Request, { params }: Ctx) {
     case "logoutAll":
       await logout.run();
       break;
+    case "removeAvatar":
+      await removeAvatar(db, id);
+      break;
+    case "adjustTokens": {
+      const e = { reason: "admin" as const, note: body.note, createdBy: a.email };
+      const ok =
+        body.amount > 0
+          ? await creditTokens(db, id, body.amount, e)
+          : await spendTokens(db, id, -body.amount, e);
+      if (ok == null) return jsonError(409, "餘額不夠扣");
+      break;
+    }
   }
-  await audit(db, a, `user.${body.action}`, id, { nickname: user.nickname });
+  await audit(db, a, `user.${body.action}`, id, {
+    nickname: user.nickname,
+    ...(body.action === "adjustTokens" ? { amount: body.amount, note: body.note } : {}),
+  });
   return NextResponse.json({ ok: true });
 }

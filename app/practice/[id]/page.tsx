@@ -7,6 +7,9 @@ import type { Article } from "@/lib/db";
 import { rowsToTree, type OutlineRow } from "@/lib/outline";
 import { OutlineEditor, ResultView, type AttemptResult } from "@/components/practice";
 import { MicButton, ReadAloudBar, useDictationTarget, useReadAloud } from "@/components/speech";
+import { refreshUserMenu } from "@/components/UserMenu";
+
+const GRADE_COST = 2;
 
 type SessionData = {
   sessionId: string;
@@ -15,6 +18,7 @@ type SessionData = {
   summaryRange: [number, number];
   /** 之前其他次練習這篇的最高分；null = 第一次做 */
   previousBest: number | null;
+  tokens: number;
 };
 
 const NO_PARAGRAPHS: Article["paragraphs"] = [];
@@ -92,10 +96,13 @@ export default function PracticePage() {
         body: JSON.stringify({ outline: rowsToTree(rows), summary }),
       });
       setResult(r);
+      setData((d) => (d ? { ...d, tokens: r.tokens ?? d.tokens } : d));
+      refreshUserMenu();
       setHistory((h) => [...h, r.total]);
       requestAnimationFrame(() => document.getElementById("result")?.scrollIntoView({ behavior: "smooth" }));
     } catch (e) {
       setSubmitError((e as Error).message);
+      refreshUserMenu(); // 失敗會退回 Token，頁首重新讀
     } finally {
       setSubmitting(false);
     }
@@ -199,8 +206,10 @@ export default function PracticePage() {
         />
         <p className={`count ${sumChars > summaryRange[1] ? "over" : ""}`}>{sumChars} 字</p>
 
-        <button className="primary big" onClick={submit} disabled={submitting}>
-          {submitting ? "老師批改中…（約 10–30 秒）" : result ? "修改後再評一次" : "送出評分"}
+        <button className="primary big" onClick={submit} disabled={submitting || data.tokens < GRADE_COST}>
+          {submitting
+            ? "老師批改中…（約 10–30 秒）"
+            : `${result ? "修改後再評一次" : "送出評分"}（用 ${GRADE_COST} Token，剩 ${data.tokens}）`}
         </button>
         {submitError && <p className="error">{submitError}</p>}
       </section>

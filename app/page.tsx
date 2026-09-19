@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ApiError, api, getPref, setAccessCode, setPref } from "@/lib/client";
 import type { Stats } from "@/lib/db";
 
-type Me = { id: string; nickname: string; hasParentPin: boolean } | null;
+type Me = { id: string; nickname: string; hasParentPin: boolean; gradeLevel: string | null; tokens: number } | null;
 type ArticleItem = { id: string; title: string; author: string; era: string | null; genre: string; difficulty: number; char_count: number; best: number | null };
 
 const GENRE_OPTIONS = ["全部", "文言文", "散文", "記敘文"];
@@ -17,6 +17,7 @@ export default function Home() {
   const [articles, setArticles] = useState<ArticleItem[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [me, setMe] = useState<Me | undefined>(undefined);
+  const [welcome, setWelcome] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needCode, setNeedCode] = useState(false);
@@ -36,6 +37,9 @@ export default function Home() {
       ]);
       setArticles(a.articles);
       setMe(m.user);
+      // 沒選過國中／高中時，依個人資料的年級預設
+      if (m.user?.gradeLevel && !getPref("grade")) setGrade(m.user.gradeLevel.startsWith("s") ? "senior" : "junior");
+      if (new URLSearchParams(window.location.search).get("welcome")) setWelcome(true);
       if (m.user) setStats(await api<Stats>("/api/me/stats"));
       setNeedCode(false);
     } catch (e) {
@@ -97,6 +101,16 @@ export default function Home() {
 
   return (
     <div className="home">
+      {welcome && me && (
+        <p className="gift" role="status">
+          🎉 歡迎，{me.nickname}！已送你 {me.tokens} 個 Token，每次評分用 2 個。選一篇文章開始吧。
+        </p>
+      )}
+      {me && me.tokens < 2 && (
+        <p className="error small" role="status">
+          Token 不足（剩 {me.tokens} 個），暫時不能評分。
+        </p>
+      )}
       {me === undefined ? (
         <section className="card dash muted">載入中…</section>
       ) : me ? (

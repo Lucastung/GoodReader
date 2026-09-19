@@ -2,6 +2,7 @@
 import { getStats } from "./db";
 import type { ArticleInputT } from "./schemas";
 import { countHan } from "./textcheck";
+import { tokenHistory } from "./tokens";
 
 // ---------- 帳戶 ----------
 
@@ -15,6 +16,8 @@ export type AdminUserRow = {
   points: number;
   redeemed: number;
   last_active: string | null;
+  token_balance: number;
+  grade_level: string | null;
 };
 
 export async function listUsers(db: D1Database, q: string, limit: number, offset: number) {
@@ -30,6 +33,7 @@ export async function listUsers(db: D1Database, q: string, limit: number, offset
          agg AS (SELECT client_id, COUNT(*) AS done, SUM(best) AS pts, MAX(last) AS last FROM best GROUP BY client_id),
          red AS (SELECT client_id, SUM(points) AS redeemed FROM redemptions GROUP BY client_id)
          SELECT u.id, u.nickname, u.created_at, u.disabled, (u.parent_pin_hash IS NOT NULL) AS has_parent_pin,
+                u.token_balance, u.grade_level,
                 COALESCE(agg.done, 0) AS done, COALESCE(agg.pts, 0) AS points,
                 COALESCE(red.redeemed, 0) AS redeemed, agg.last AS last_active
          FROM users u LEFT JOIN agg ON agg.client_id = u.id LEFT JOIN red ON red.client_id = u.id
@@ -46,10 +50,22 @@ export async function listUsers(db: D1Database, q: string, limit: number, offset
 export async function userDetail(db: D1Database, id: string) {
   const user = await db
     .prepare(
-      "SELECT id, nickname, created_at, disabled, (parent_pin_hash IS NOT NULL) AS has_parent_pin FROM users WHERE id = ?",
+      `SELECT id, nickname, created_at, disabled, (parent_pin_hash IS NOT NULL) AS has_parent_pin,
+              grade_level, bio, avatar_version, token_balance
+       FROM users WHERE id = ?`,
     )
     .bind(id)
-    .first<{ id: string; nickname: string; created_at: string; disabled: number; has_parent_pin: number }>();
+    .first<{
+      id: string;
+      nickname: string;
+      created_at: string;
+      disabled: number;
+      has_parent_pin: number;
+      grade_level: string | null;
+      bio: string | null;
+      avatar_version: number;
+      token_balance: number;
+    }>();
   if (!user) return null;
   const [sessions, redemptions, logins] = await db.batch([
     db
@@ -72,6 +88,7 @@ export async function userDetail(db: D1Database, id: string) {
     sessions: sessions.results,
     redemptions: redemptions.results,
     activeLogins: (logins.results[0] as { n: number }).n,
+    tokenHistory: await tokenHistory(db, id),
   };
 }
 

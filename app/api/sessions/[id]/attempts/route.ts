@@ -4,6 +4,7 @@ import { gradeAttempt } from "@/lib/grader";
 import { GRADES_PER_HOUR, checkAccess, cfEnv, jsonError, requireUser } from "@/lib/http";
 import { SubmitAttemptInput } from "@/lib/schemas";
 import { precheck } from "@/lib/textcheck";
+import { GRADE_COST, creditTokens, spendTokens } from "@/lib/tokens";
 
 /** 送出大綱與摘要 → 評分 */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -30,12 +31,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if ((await gradesInLastHour(env.DB, clientId)) >= GRADES_PER_HOUR)
     return jsonError(429, `每小時最多評分 ${GRADES_PER_HOUR} 次，請稍後再試`);
 
+  // 先扣 Token；評分失敗就退回
+  const tokens = await spendTokens(env.DB, clientId, GRADE_COST, { reason: "grade", ref: id, note: article.title });
+  if (tokens == null) return jsonError(402, `Token 不足：每次評分需要 ${GRADE_COST} 個 Token`);
+
   let result;
   try {
     result = await gradeAttempt(env, article, session.grade, outline, summary);
   } catch (e) {
     console.error("grade failed", e);
-    return jsonError(502, `評分失敗：${(e as Error).message}`);
+    await creditTokens(env.DB, clientId, GRADE_COST, { reason: "refund", ref: id, note: "評分失敗，退回" }).catch(() => {});
+    return jsonError(502, `評分失敗（已退回 ${GRADE_COST} Token）：${(e as Error).message}`);
   }
 
   const attemptId = crypto.randomUUID();
@@ -55,5 +61,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     },
   );
 
-  return NextResponse.json({ attemptId, readSeconds, ...result });
+  return NextResponse.json({ attemptId, readSeconds, tokens, ...result });
 }

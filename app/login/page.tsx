@@ -3,6 +3,16 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ApiError, api, getClientId, setAccessCode } from "@/lib/client";
+import { AvatarPicker } from "@/components/AvatarPicker";
+
+const GRADE_OPTIONS = [
+  ["j1", "國一"],
+  ["j2", "國二"],
+  ["j3", "國三"],
+  ["s1", "高一"],
+  ["s2", "高二"],
+  ["s3", "高三"],
+] as const;
 
 export default function LoginPage() {
   return (
@@ -23,6 +33,9 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [needCode, setNeedCode] = useState(false);
   const [code, setCode] = useState("");
+  const [gradeLevel, setGradeLevel] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatar, setAvatar] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,11 +45,17 @@ function LoginForm() {
     setBusy(true);
     try {
       if (needCode) setAccessCode(code.trim());
-      await api(`/api/auth/${mode}`, {
-        method: "POST",
-        body: JSON.stringify({ nickname, pin, anonId: getClientId() }),
-      });
-      window.location.href = next;
+      const body: Record<string, unknown> = { nickname, pin, anonId: getClientId() };
+      if (mode === "register") {
+        body.gradeLevel = gradeLevel || null;
+        body.bio = bio.trim() || null;
+      }
+      await api(`/api/auth/${mode}`, { method: "POST", body: JSON.stringify(body) });
+      // 帳號建好後再上傳頭像；頭像失敗不影響註冊，之後可在個人資料頁補傳
+      if (mode === "register" && avatar) {
+        await api("/api/me/avatar", { method: "PUT", body: JSON.stringify({ dataUrl: avatar }) }).catch(() => {});
+      }
+      window.location.href = mode === "register" && next === "/" ? "/?welcome=1" : next;
     } catch (err) {
       if (err instanceof ApiError && err.status === 401 && err.message === "需要通行碼") setNeedCode(true);
       setError((err as Error).message);
@@ -86,6 +105,31 @@ function LoginForm() {
             />
           </label>
         )}
+        {mode === "register" && (
+          <fieldset className="fieldset">
+            <legend>個人資料（都可以之後再填）</legend>
+            <AvatarPicker nickname={nickname} version={0} preview={avatar} onPick={setAvatar} onRemove={() => setAvatar(null)} />
+            <label>
+              年級 <span className="optional">選填，會幫你預設國中或高中的文章</span>
+              <select value={gradeLevel} onChange={(e) => setGradeLevel(e.target.value)}>
+                <option value="">不填</option>
+                {GRADE_OPTIONS.map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              一句話介紹自己 <span className="optional">選填，最多 60 字</span>
+              <input value={bio} maxLength={60} onChange={(e) => setBio(e.target.value)} placeholder="例：喜歡讀推理小說" />
+            </label>
+            <p className="muted small" style={{ margin: 0 }}>
+              請不要填真實姓名、學校、電話或地址。
+            </p>
+          </fieldset>
+        )}
+        {mode === "register" && <p className="gift">🎁 註冊就送 100 個 Token，每次評分用 2 個。</p>}
         {needCode && (
           <label>
             網站通行碼

@@ -1,5 +1,6 @@
 // 學生帳號：暱稱＋PIN。PIN 以 PBKDF2-SHA256 雜湊保存；登入狀態用 HttpOnly cookie。
 import { z } from "zod";
+import { SIGNUP_BONUS, creditTokens } from "./tokens.ts";
 
 export const SESSION_COOKIE = "gr_session";
 export const SESSION_DAYS = 30;
@@ -15,7 +16,23 @@ export const NicknameSchema = z
   .regex(/^[\p{L}\p{N}_\- ]+$/u, "暱稱只能用文字、數字、底線或連字號");
 export const PinSchema = z.string().regex(/^\d{4,6}$/, "PIN 要是 4–6 位數字");
 
-export type User = { id: string; nickname: string; hasParentPin: boolean };
+/** 年級：國一～高三 */
+export const GRADE_LEVELS = ["j1", "j2", "j3", "s1", "s2", "s3"] as const;
+export type GradeLevel = (typeof GRADE_LEVELS)[number];
+export const GRADE_LEVEL_LABEL: Record<GradeLevel, string> = { j1: "國一", j2: "國二", j3: "國三", s1: "高一", s2: "高二", s3: "高三" };
+export const GradeLevelSchema = z.enum(GRADE_LEVELS);
+export const BioSchema = z.string().trim().max(60, "自我介紹最多 60 字");
+
+export type User = {
+  id: string;
+  nickname: string;
+  hasParentPin: boolean;
+  gradeLevel: GradeLevel | null;
+  bio: string | null;
+  /** 0 = 沒有頭像；大於 0 時頭像網址加 ?v= 這個數字 */
+  avatarVersion: number;
+  tokens: number;
+};
 
 export const nicknameKey = (n: string) => n.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -86,32 +103,61 @@ type UserRow = {
   parent_pin_hash: string | null;
   parent_pin_salt: string | null;
   disabled?: number;
+  grade_level: GradeLevel | null;
+  bio: string | null;
+  avatar_version: number;
+  token_balance: number;
 };
 
-const toUser = (r: UserRow): User => ({ id: r.id, nickname: r.nickname, hasParentPin: !!r.parent_pin_hash });
+const USER_COLS =
+  "id, nickname, pin_hash, pin_salt, parent_pin_hash, parent_pin_salt, disabled, grade_level, bio, avatar_version, token_balance";
+
+const toUser = (r: UserRow): User => ({
+  id: r.id,
+  nickname: r.nickname,
+  hasParentPin: !!r.parent_pin_hash,
+  gradeLevel: r.grade_level ?? null,
+  bio: r.bio ?? null,
+  avatarVersion: r.avatar_version ?? 0,
+  tokens: r.token_balance ?? 0,
+});
 
 export async function findUserByNickname(db: D1Database, nickname: string) {
   return db
-    .prepare("SELECT id, nickname, pin_hash, pin_salt, parent_pin_hash, parent_pin_salt, disabled FROM users WHERE nickname_key = ?")
+    .prepare(`SELECT ${USER_COLS} FROM users WHERE nickname_key = ?`)
     .bind(nicknameKey(nickname))
     .first<UserRow>();
 }
 
 export async function getUserRow(db: D1Database, id: string) {
   return db
-    .prepare("SELECT id, nickname, pin_hash, pin_salt, parent_pin_hash, parent_pin_salt, disabled FROM users WHERE id = ?")
+    .prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`)
     .bind(id)
     .first<UserRow>();
 }
 
-export async function createUser(db: D1Database, nickname: string, pin: string): Promise<User> {
+export async function createUser(
+  db: D1Database,
+  nickname: string,
+  pin: string,
+  profile: { gradeLevel?: GradeLevel | null; bio?: string | null } = {},
+): Promise<User> {
   const id = crypto.randomUUID();
   const { hash, salt } = await hashPin(pin);
   await db
-    .prepare("INSERT INTO users (id, nickname, nickname_key, pin_hash, pin_salt) VALUES (?, ?, ?, ?, ?)")
-    .bind(id, nickname.trim(), nicknameKey(nickname), hash, salt)
+    .prepare("INSERT INTO users (id, nickname, nickname_key, pin_hash, pin_salt, grade_level, bio) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(id, nickname.trim(), nicknameKey(nickname), hash, salt, profile.gradeLevel ?? null, profile.bio?.trim() || null)
     .run();
-  return { id, nickname: nickname.trim(), hasParentPin: false };
+  const tokens = await creditTokens(db, id, SIGNUP_BONUS, { reason: "signup", note: "註冊禮" });
+  return {
+    id,
+    nickname: nickname.trim(),
+    hasParentPin: false,
+    gradeLevel: profile.gradeLevel ?? null,
+    bio: profile.bio?.trim() || null,
+    avatarVersion: 0,
+    tokens,
+  };
 }
 
 export async function setParentPin(db: D1Database, userId: string, pin: string) {
@@ -159,7 +205,8 @@ export async function currentUser(req: Request, db: D1Database): Promise<User | 
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
   const r = await db
     .prepare(
-      `SELECT u.id, u.nickname, u.pin_hash, u.pin_salt, u.parent_pin_hash, u.parent_pin_salt
+      `SELECT u.id, u.nickname, u.pin_hash, u.pin_salt, u.parent_pin_hash, u.parent_pin_salt, u.disabled,
+              u.grade_level, u.bio, u.avatar_version, u.token_balance
        FROM auth_sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND u.disabled = 0`,
     )

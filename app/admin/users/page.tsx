@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import { AdminOnly, fmtDate, fmtTime } from "../AdminShell";
+import { Avatar } from "@/components/Avatar";
+
+const GRADE_LABEL: Record<string, string> = { j1: "國一", j2: "國二", j3: "國三", s1: "高一", s2: "高二", s3: "高三" };
+const REASON: Record<string, string> = { signup: "註冊禮", grade: "評分", refund: "評分失敗退回", admin: "管理者調整", purchase: "購買" };
 
 type Row = {
   id: string;
@@ -14,9 +18,22 @@ type Row = {
   points: number;
   redeemed: number;
   last_active: string | null;
+  token_balance: number;
+  grade_level: string | null;
 };
 type Detail = {
-  user: { id: string; nickname: string; created_at: string; disabled: number; has_parent_pin: number };
+  user: {
+    id: string;
+    nickname: string;
+    created_at: string;
+    disabled: number;
+    has_parent_pin: number;
+    grade_level: string | null;
+    bio: string | null;
+    avatar_version: number;
+    token_balance: number;
+  };
+  tokenHistory: { id: string; delta: number; balance_after: number; reason: string; note: string | null; created_by: string | null; created_at: string }[];
   stats: { completed: number; totalPoints: number; redeemed: number; remaining: number; byDifficulty: { difficulty: number; count: number; avg: number | null }[] };
   sessions: { id: string; started_at: string; grade: string; title: string; difficulty: number; attempts: number; best: number | null }[];
   redemptions: { id: string; points: number; created_at: string }[];
@@ -71,6 +88,8 @@ function Users() {
           <thead>
             <tr>
               <th>暱稱</th>
+              <th>年級</th>
+              <th className="num">Token</th>
               <th className="num">完成篇數</th>
               <th className="num">總積分</th>
               <th className="num">已扣除</th>
@@ -86,6 +105,8 @@ function Users() {
                 <td>
                   {u.nickname} {u.disabled ? <span className="badge off">停用</span> : null}
                 </td>
+                <td>{u.grade_level ? GRADE_LABEL[u.grade_level] : "—"}</td>
+                <td className="num">{u.token_balance}</td>
                 <td className="num">{u.done}</td>
                 <td className="num">{u.points}</td>
                 <td className="num">{u.redeemed}</td>
@@ -97,7 +118,7 @@ function Users() {
             ))}
             {data && !data.users.length && (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={10} className="muted">
                   沒有符合的帳號
                 </td>
               </tr>
@@ -126,6 +147,8 @@ function Users() {
 function UserDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
   const [d, setD] = useState<Detail | null>(null);
   const [pin, setPin] = useState("");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -140,7 +163,7 @@ function UserDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
   }, [load]);
 
   async function act(body: Record<string, unknown>, done: string, confirmText?: string) {
-    if (confirmText && !window.confirm(confirmText)) return;
+    if (confirmText && !window.confirm(confirmText)) return false;
     setBusy(true);
     setMsg(null);
     try {
@@ -149,8 +172,10 @@ function UserDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
       setPin("");
       load();
       onChanged();
+      return true;
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -160,9 +185,23 @@ function UserDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
   const u = d.user;
   return (
     <div className="panel">
-      <h3>
-        {u.nickname} {u.disabled ? <span className="badge off">停用</span> : null}
-      </h3>
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <Avatar
+          nickname={u.nickname}
+          version={u.avatar_version}
+          src={u.avatar_version > 0 ? `/api/admin/users/${u.id}/avatar?v=${u.avatar_version}` : null}
+          size={56}
+        />
+        <div>
+          <h3 style={{ margin: 0 }}>
+            {u.nickname} {u.disabled ? <span className="badge off">停用</span> : null}
+          </h3>
+          <div className="small muted">
+            {u.grade_level ? GRADE_LABEL[u.grade_level] : "未填年級"}
+            {u.bio ? `・${u.bio}` : ""}
+          </div>
+        </div>
+      </div>
       <p className="small muted">
         建立於 {fmtTime(u.created_at)}・目前 {d.activeLogins} 個裝置登入中・完成 {d.stats.completed} 篇・剩餘積分{" "}
         {d.stats.remaining}／{d.stats.totalPoints}
@@ -193,6 +232,15 @@ function UserDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
         <button className="btn" disabled={busy || !d.activeLogins} onClick={() => act({ action: "logoutAll" }, "已登出所有裝置")}>
           登出所有裝置
         </button>
+        {u.avatar_version > 0 && (
+          <button
+            className="btn danger"
+            disabled={busy}
+            onClick={() => act({ action: "removeAvatar" }, "頭像已移除", "確定移除這個頭像？（不當圖片時使用）")}
+          >
+            移除頭像
+          </button>
+        )}
         {u.disabled ? (
           <button className="btn ok" disabled={busy} onClick={() => act({ action: "enable" }, "帳號已啟用")}>
             啟用帳號
@@ -208,6 +256,58 @@ function UserDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
         )}
       </div>
       {msg && <p className={`msg ${msg.ok ? "ok" : "error"}`}>{msg.text}</p>}
+
+      <h3>Token（餘額 {u.token_balance}）</h3>
+      <div className="toolbar">
+        <input
+          style={{ width: "8em" }}
+          inputMode="numeric"
+          placeholder="+50 或 -10"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value.replace(/[^\d+-]/g, "").slice(0, 6))}
+        />
+        <input style={{ width: "auto", flex: 1, minWidth: 160 }} placeholder="原因（必填，例：活動獎勵、補償）" value={note} maxLength={100} onChange={(e) => setNote(e.target.value)} />
+        <button
+          className="btn"
+          disabled={busy || !Number(amount) || !note.trim()}
+          onClick={() => {
+            const n = Number(amount);
+            act({ action: "adjustTokens", amount: n, note: note.trim() }, `已${n > 0 ? "增加" : "扣除"} ${Math.abs(n)} Token`).then((ok) => {
+              if (!ok) return;
+              setAmount("");
+              setNote("");
+            });
+          }}
+        >
+          調整 Token
+        </button>
+      </div>
+      <div className="tbl-wrap" style={{ marginTop: 8, maxHeight: 240, overflowY: "auto" }}>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>時間</th>
+              <th>項目</th>
+              <th className="num">增減</th>
+              <th className="num">餘額</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.tokenHistory.map((t) => (
+              <tr key={t.id}>
+                <td>{fmtTime(t.created_at)}</td>
+                <td className="wrap">
+                  {REASON[t.reason] ?? t.reason}
+                  {t.note && t.reason !== "signup" ? `：${t.note}` : ""}
+                  {t.created_by ? <span className="muted small">（{t.created_by}）</span> : null}
+                </td>
+                <td className="num">{t.delta > 0 ? `+${t.delta}` : t.delta}</td>
+                <td className="num">{t.balance_after}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="two">
         <div>

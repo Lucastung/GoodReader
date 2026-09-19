@@ -25,5 +25,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     summaryRange: suggestedSummaryRange(article.charCount),
     attempts: await listAttempts(env.DB, id),
     previousBest: await previousBest(env.DB, clientId, session.article_id, session.id),
+    tokens: user.tokens,
   });
 }

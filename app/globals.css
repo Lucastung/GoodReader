@@ -326,3 +326,41 @@ button.pid:hover { border-color: var(--accent); color: var(--accent); }
   border: 1px solid var(--lv-a); border-radius: 99px; padding: 0 8px; white-space: nowrap;
 }
 .redo-note { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 0.88rem; }
+
+/* 頭像與 Token */
+.avatar { border-radius: 50%; object-fit: cover; flex-shrink: 0; display: inline-block; background: var(--line); }
+.avatar.initial { display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; line-height: 1; }
+.me-link { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); }
+.token-chip {
+  font-size: 0.85rem; font-weight: 700; text-decoration: none; color: var(--text); white-space: nowrap;
+  border: 1px solid var(--line); border-radius: 99px; padding: 1px 10px; background: var(--surface);
+}
+@media (max-width: 480px) {
+  .user-menu { gap: 8px; }
+  .me-link .who { display: none; }
+}
+.avatar-pick { display: flex; align-items: center; gap: 14px; }
+.avatar-pick .btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.file-btn { position: relative; overflow: hidden; display: inline-block; }
+.file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.btn-outline { background: var(--surface); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; }
+.login-form select, .profile-form select { width: 100%; }
+.optional { font-weight: 400; color: var(--muted); font-size: 0.8rem; }
+.fieldset { border: 1px dashed var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 12px; margin: 0; }
+.fieldset legend { font-size: 0.85rem; color: var(--muted); padding: 0 6px; }
+.gift { background: var(--accent-soft); border-radius: 10px; padding: 8px 12px; font-size: 0.88rem; margin: 0; }
+
+/* 個人資料頁 */
+.profile { max-width: 560px; margin: 0 auto; display: grid; gap: 14px; }
+.profile-form { display: grid; gap: 12px; }
+.profile-form label { display: grid; gap: 4px; font-size: 0.9rem; color: var(--muted); }
+.token-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.token-big { font-size: 2.2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ledger { list-style: none; padding: 0; margin: 0; display: grid; }
+.ledger li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
+.ledger li:last-child { border-bottom: 0; }
+.ledger .d { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ledger .d.plus { color: var(--lv-a); }
+.ledger .d.minus { color: var(--lv-d); }
+.ledger .what { min-width: 0; }
+.ledger .what small { display: block; color: var(--muted); }
