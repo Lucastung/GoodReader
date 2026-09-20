@@ -112,7 +112,7 @@ export default function MePage() {
             <div className="muted small">名稱</div>
             <div>
               <b>{me.nickname}</b>{" "}
-              <a className="small" href="https://lucasact.com/" title="名稱與帳號在 lucasact.com 管理">
+              <a className="small" href="https://lucasact.com/account.html" title="名稱、頭像與年齡識別在 lucasact.com 管理">
                 在 lucasact.com 修改
               </a>
             </div>
