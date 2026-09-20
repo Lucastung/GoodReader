@@ -18,6 +18,8 @@ export type QuizSessionData = {
   mode: "basic";
   article: Article;
   tokens: number;
+  /** 管理員：不扣 Token */
+  unlimited?: boolean;
   /** 還沒交卷：題目（不含答案）；交過卷為 null */
   questions: PublicQuestion[] | null;
   /** 交過卷：成績與解析 */
@@ -216,11 +218,11 @@ export function QuizPractice({ initial }: { initial: QuizSessionData }) {
                 <button
                   className="primary big"
                   onClick={() => setConfirming(true)}
-                  disabled={answered < questions.length || tokens < GRADE_COST}
+                  disabled={answered < questions.length || (!initial.unlimited && tokens < GRADE_COST)}
                 >
                   {answered < questions.length
                     ? `還有 ${questions.length - answered} 題沒作答`
-                    : `交卷（用 ${GRADE_COST} Token，剩 ${tokens}）`}
+                    : initial.unlimited ? "交卷" : `交卷（用 ${GRADE_COST} Token，剩 ${tokens}）`}
                 </button>
               )}
             </>

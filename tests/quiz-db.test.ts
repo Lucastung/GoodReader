@@ -8,7 +8,7 @@ import { mockQuiz, quizAttemptFor, quizDoneArticleIds, resultFromRow, saveQuizAt
 async function setup() {
   const db = makeD1();
   await db
-    .prepare("INSERT INTO users (id, nickname, nickname_key, pin_hash, pin_salt) VALUES ('u1', '小明', '小明', 'x', 'y')")
+    .prepare("INSERT INTO users (id, name) VALUES ('u1', '小明')")
     .run();
   return db;
 }
@@ -65,7 +65,14 @@ test("閱讀測驗：每篇只能作答一次，積分與進階分開累計", as
   assert.equal(users.users[0].points, 95);
   assert.equal(users.users[0].done, 2);
 
-  const detail = await userDetail(db, "u1");
+  const fakeAccounts = {
+    user: async () => null,
+    balance: async () => ({ monthly: 100, bought: 0, total: 100, allowance: 100, unlimited: false }),
+    ledger: async () => [],
+  };
+  const detail = await userDetail({ DB: db, ACCOUNTS: fakeAccounts } as unknown as CloudflareEnv, "u1");
+  assert.equal(detail!.user.nickname, "小明");
+  assert.equal(detail!.balance.total, 100);
   const byId = Object.fromEntries((detail!.sessions as { id: string; mode: string; best: number | null }[]).map((s) => [s.id, s]));
   assert.equal(byId.s1.mode, "basic");
   assert.equal(byId.s1.best, 15);

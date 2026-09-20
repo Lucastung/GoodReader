@@ -66,6 +66,8 @@ npm test                          # 評分邏輯、大綱轉換、收集器抽�
 
 `LLM_MOCK=1` 會用假資料回應，可在沒有金鑰時測整個流程與畫面。
 
+登入要靠 accounts：本機另開一個視窗在 `lucasact-accounts` 跑 `npm run dev`（wrangler 會把兩個 Worker 接起來），並把兩邊的 `PUBLIC_URL` / `ACCOUNTS_URL` 改成 localhost。
+
 ## 設定
 
 | 變數 | 位置 | 說明 |
@@ -137,7 +139,7 @@ npm test                          # 評分邏輯、大綱轉換、收集器抽�
 | 頁面 | 誰能用 | 功能 |
 | --- | --- | --- |
 | 使用與成本 | 管理者 | 每日評分次數、活躍學生、新帳號、各模型 tokens 與估算成本、每次評分成本、月成本推估、模型單價設定 |
-| 帳戶 | 管理者 | 搜尋學生、看練習與扣除紀錄、重設 PIN、清除家長 PIN、登出所有裝置、停用／啟用 |
+| 帳戶 | 管理者 | 搜尋學生、看練習與扣除紀錄、Token 餘額與明細、加減 Token、移除頭像、在好好讀書停用／啟用 |
 | 範文 | 管理者、審稿老師 | 列表（待審／上架／下架）、AI 撰寫、手動新增、JSON 匯入、編輯、預覽、產生要點底稿檢查、上架／下架 |
 | 權限 | 管理者 | 加入審稿老師或其他管理者、操作紀錄 |
 
@@ -176,7 +178,7 @@ app/                     頁面與 API 路由
   practice/[id]/page.tsx 閱讀、大綱編輯器、摘要、評分結果
   api/sessions/…         抽文、取回練習、送出評分
   login/page.tsx         登入／建立帳號
-  api/auth/…             註冊、登入、登出、目前使用者
+  api/auth/me            目前使用者與登入／登出網址（登入在 accounts.lucasact.com）
   api/me/…               學習概況、積分扣除
   admin/…                後台頁面（使用與成本、帳戶、範文、權限）
   api/admin/…            後台 API（Cloudflare Access 驗證）
@@ -185,7 +187,7 @@ lib/
   rubric.ts  textcheck.ts         配分、抄錄偵測、前檢查
   collector.ts                    白名單收集器
   db.ts                           D1 存取
-  auth.ts                         帳號、PIN 雜湊、登入狀態、錯誤鎖定
+  auth.ts  tokens.ts               接 lucasact 帳號服務：登入 cookie → 使用者、扣點與退回
   admin.ts  admin-db.ts           後台身分（Access JWT）、後台查詢
 migrations/                       D1 schema 與經典文章種子資料
 data/classics.json                內建文章原始資料
@@ -193,21 +195,20 @@ data/classics.json                內建文章原始資料
 
 ## 帳號與積分
 
-- 學生用「暱稱＋PIN（4–6 位數字）」建立帳號；積分綁帳號，換裝置登入都看得到。第一次登入時，這台瀏覽器先前的匿名練習紀錄會併入帳號。
-- PIN 以 PBKDF2-SHA256（加 salt）雜湊保存；登入狀態是 30 天的 HttpOnly cookie（資料庫只存 token 的 SHA-256）。
-- 同一暱稱 15 分鐘內 PIN 錯 5 次會暫停登入；家長 PIN 也一樣。
-- 每篇文章只計分一次，取這篇所有練習中的最高分（重做同一篇不會重複加分，進步時只補差額）；評過的文章在清單上標「✓ 已評 N 分」。剩餘積分 = 總積分 − 已扣除。
-- 「扣除」需要家長 PIN：帳號第一次扣除時由家長設定（不能和學生 PIN 相同），之後每次扣除都要輸入。
-- 忘記 PIN、忘記家長 PIN、要停用帳號：在後台「帳戶」頁處理。
+- 帳號由 **lucasact 帳號服務**（`accounts.lucasact.com`，repo `Lucastung/Lucastung-lucasact-accounts`）管：用 Google（之後加 Facebook）登入，不分家長與學生。好好讀書、FreeScript、FishOn、lucasact.com 共用同一個帳號與 Token 錢包。
+- 好好讀書可以單獨登入：`/login` 的按鈕直接連到 `accounts.lucasact.com/auth/google?next=<好好讀書的網址>`，登完回來，不經過 lucasact.com 的畫面。
+- 登入 cookie `lx_session` 設在 `.lucasact.com`（HttpOnly）；好好讀書把它交給 accounts 的 RPC（Service Binding `ACCOUNTS`，不經過公網）換成使用者，見 `lib/auth.ts`。在 lucasact.com 登入過，進好好讀書就已經是登入狀態；登出也是全站一起登出。
+- 每篇文章只計分一次，取這篇所有練習中的最高分（重做同一篇不會重複加分，進步時只補差額）；評過的文章在清單上標「✓ 已評 N 分」。剩餘積分 = 總積分 − 已扣除。「扣除」直接扣，不需要密碼。
+- 整個帳號的停用在 accounts；後台「帳戶」頁的停用只影響好好讀書。
 
 ## 個人資料與 Token
 
-- 註冊時可選填頭像、年級（國一～高三）、一句自我介紹；之後在 `/me` 修改。不收真實姓名、生日、學校、聯絡方式。
+- 名稱、頭像預設用 Google 帳號的；名稱在 lucasact.com 改。好好讀書自己存年級（國一～高三）、一句自我介紹、自己上傳的頭像（`users` 表，id 就是 accounts 的使用者 id，第一次進來時建立）。
 - 頭像只能自己上傳（不開放 AI 生成）。瀏覽器先裁成 256×256 並重新編碼（去掉 EXIF／拍照定位），上限 80 KB，存在 D1 的 `avatars` 表。頭像不公開，只有本人和管理者看得到；管理者可在後台移除不當頭像。
-- Token：註冊送 100，每次送出評分扣 2（重交也扣），評分失敗自動退回；餘額不足不能開始練習或送出。上線時舊帳號一次補發 100。
-- 每一筆增減都記在 `token_ledger`（原因：signup／grade／refund／admin／purchase），`users.token_balance` 是餘額；扣款用條件更新，同時送出兩次也不會扣成負數。
-- 管理者可在後台「帳戶」頁手動加減 Token（要寫原因，會記下是誰調整的）。
-- 之後接綠界購買時，付款成功就寫一筆 `purchase`（`ref` 放訂單編號），其他部分不用改。數字在 `lib/tokens.ts`。
+- Token 是全站共用的錢包（accounts 管）：每月依等級發放（台北時間換月歸零重發）＋購買、轉贈收到的（不過期）。每次送出評分扣 2（重交也扣），評分失敗自動退回；餘額不足不能開始練習或送出。管理員不扣。
+- 扣點都帶冪等鍵：進階是 `grade:<attemptId>`、閱讀測驗是 `quiz:<sessionId>`，網路重試或同時交兩次卷也只扣一次。見 `lib/tokens.ts`。
+- 明細在 `/me`，包含在其他應用用掉的。加值、轉贈在 lucasact.com。
+- 管理者可在後台「帳戶」頁手動加減 Token（要寫原因，會記下是誰調整的）；扣只能扣購買來的部分。
 
 ## Demo 還沒做的
 

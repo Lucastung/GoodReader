@@ -3,6 +3,9 @@ DEEPINFRA_API_KEY=your-deepinfra-key
 # LLM_MOCK=1 時不呼叫 DeepInfra，改用假資料，方便測流程
 LLM_MOCK=0
 DEMO_ACCESS_CODE=
+# 本機開發：帳號服務的網址（登入按鈕連過去）
+ACCOUNTS_URL=http://localhost:8788
+PUBLIC_URL=http://localhost:8787
 ADMIN_TOKEN=change-me
 # 本機開發時用這個 email 直接進 /admin（只在 localhost 生效）
 ADMIN_DEV_EMAIL=you@example.com

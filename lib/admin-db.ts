@@ -3,21 +3,21 @@ import { BEST_CTE, getStats } from "./db.ts";
 import type { ArticleInputT } from "./schemas.ts";
 import { countHan } from "./textcheck.ts";
 import { getQuiz } from "./quiz.ts";
-import { tokenHistory } from "./tokens.ts";
 
 // ---------- 帳戶 ----------
+// 帳號與 Token 在 lucasact 帳號服務；這裡是好好讀書這邊的個人設定與練習紀錄。
 
 export type AdminUserRow = {
   id: string;
   nickname: string;
+  avatar_url: string;
   created_at: string;
   disabled: number;
-  has_parent_pin: number;
   done: number;
   points: number;
   redeemed: number;
   last_active: string | null;
-  token_balance: number;
+  last_seen_at: string;
   grade_level: string | null;
 };
 
@@ -29,42 +29,41 @@ export async function listUsers(db: D1Database, q: string, limit: number, offset
         `WITH ${BEST_CTE},
          agg AS (SELECT client_id, COUNT(*) AS done, SUM(best) AS pts, MAX(last) AS last FROM best_all GROUP BY client_id),
          red AS (SELECT client_id, SUM(points) AS redeemed FROM redemptions GROUP BY client_id)
-         SELECT u.id, u.nickname, u.created_at, u.disabled, (u.parent_pin_hash IS NOT NULL) AS has_parent_pin,
-                u.token_balance, u.grade_level,
+         SELECT u.id, u.name AS nickname, u.avatar_url, u.created_at, u.disabled, u.grade_level, u.last_seen_at,
                 COALESCE(agg.done, 0) AS done, COALESCE(agg.pts, 0) AS points,
                 COALESCE(red.redeemed, 0) AS redeemed, agg.last AS last_active
          FROM users u LEFT JOIN agg ON agg.client_id = u.id LEFT JOIN red ON red.client_id = u.id
-         WHERE u.nickname_key LIKE ?
-         ORDER BY COALESCE(agg.last, u.created_at) DESC
+         WHERE lower(u.name) LIKE ?
+         ORDER BY COALESCE(agg.last, u.last_seen_at) DESC
          LIMIT ? OFFSET ?`,
       )
       .bind(like, limit, offset),
-    db.prepare("SELECT COUNT(*) AS n FROM users WHERE nickname_key LIKE ?").bind(like),
+    db.prepare("SELECT COUNT(*) AS n FROM users WHERE lower(name) LIKE ?").bind(like),
   ]);
   return { users: rows.results as AdminUserRow[], total: (count.results[0] as { n: number }).n };
 }
 
-export async function userDetail(db: D1Database, id: string) {
+export async function userDetail(env: CloudflareEnv, id: string) {
+  const db = env.DB;
   const user = await db
     .prepare(
-      `SELECT id, nickname, created_at, disabled, (parent_pin_hash IS NOT NULL) AS has_parent_pin,
-              grade_level, bio, avatar_version, token_balance
+      `SELECT id, name AS nickname, avatar_url, created_at, last_seen_at, disabled, grade_level, bio, avatar_version
        FROM users WHERE id = ?`,
     )
     .bind(id)
     .first<{
       id: string;
       nickname: string;
+      avatar_url: string;
       created_at: string;
+      last_seen_at: string;
       disabled: number;
-      has_parent_pin: number;
       grade_level: string | null;
       bio: string | null;
       avatar_version: number;
-      token_balance: number;
     }>();
   if (!user) return null;
-  const [sessions, redemptions, logins] = await db.batch([
+  const [sessions, redemptions] = await db.batch([
     db
       .prepare(
         `SELECT s.id, s.started_at, s.grade, CASE s.mode WHEN 'basic' THEN 'basic' ELSE 'advanced' END AS mode,
@@ -77,17 +76,16 @@ export async function userDetail(db: D1Database, id: string) {
       )
       .bind(id),
     db.prepare("SELECT id, points, created_at FROM redemptions WHERE client_id = ? ORDER BY created_at DESC LIMIT 50").bind(id),
-    db
-      .prepare("SELECT COUNT(*) AS n FROM auth_sessions WHERE user_id = ? AND expires_at > datetime('now')")
-      .bind(id),
   ]);
+  const [account, balance, tokenHistory] = await Promise.all([env.ACCOUNTS.user(id), env.ACCOUNTS.balance(id), env.ACCOUNTS.ledger(id, 50)]);
   return {
     user,
+    account,
+    balance,
+    tokenHistory,
     stats: await getStats(db, id),
     sessions: sessions.results,
     redemptions: redemptions.results,
-    activeLogins: (logins.results[0] as { n: number }).n,
-    tokenHistory: await tokenHistory(db, id),
   };
 }
 
@@ -336,7 +334,7 @@ export async function usageStats(db: D1Database, days: number) {
     ),
     db
       .prepare(
-        `SELECT u.nickname, COUNT(*) AS n FROM attempts t JOIN sessions s ON s.id = t.session_id JOIN users u ON u.id = s.client_id
+        `SELECT u.name AS nickname, COUNT(*) AS n FROM attempts t JOIN sessions s ON s.id = t.session_id JOIN users u ON u.id = s.client_id
          WHERE t.submitted_at > datetime('now', ?) GROUP BY u.id ORDER BY n DESC LIMIT 10`,
       )
       .bind(since),

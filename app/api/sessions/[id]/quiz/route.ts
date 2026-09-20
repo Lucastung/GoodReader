@@ -3,7 +3,7 @@ import { getArticle, getSession } from "@/lib/db";
 import { checkAccess, cfEnv, jsonError, requireUser } from "@/lib/http";
 import { quizAttemptFor, resultFromRow, saveQuizAttempt, scoreQuiz } from "@/lib/quiz";
 import { QuizSchema, SubmitQuizInput } from "@/lib/schemas";
-import { GRADE_COST, creditTokens, spendTokens } from "@/lib/tokens";
+import { spendForGrade } from "@/lib/tokens";
 
 /** 閱讀測驗交卷：每篇只能作答一次，扣 Token，回傳成績與解析 */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -30,12 +30,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (done) return NextResponse.json({ ...resultFromRow(done), alreadyDone: true, tokens: user.tokens }, { status: 409 });
 
   const article = await getArticle(env.DB, session.article_id);
-  const tokens = await spendTokens(env.DB, clientId, GRADE_COST, {
-    reason: "grade",
-    ref: id,
-    note: `${article?.title ?? ""}（閱讀測驗）`,
-  });
-  if (tokens == null) return jsonError(402, `Token 不足：每次評分需要 ${GRADE_COST} 個 Token`);
+  // 冪等鍵用這次練習的 id：每篇只交一次卷，同時送出兩次也只扣一次
+  const paid = await spendForGrade(env, clientId, { ref: id, idemKey: `quiz:${id}`, note: `${article?.title ?? ""}（閱讀測驗）` });
+  if (!paid.ok) return jsonError(402, paid.message);
+  const tokens = paid.balance;
 
   const result = scoreQuiz(quiz.data, answers);
   const readSeconds = Math.round((Date.now() - Date.parse(session.started_at + "Z")) / 1000);
@@ -50,10 +48,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     readSeconds,
   });
   if (!saved) {
-    // 同時送出兩次：第二次不計，退回 Token
-    const back = await creditTokens(env.DB, clientId, GRADE_COST, { reason: "refund", ref: id, note: "重複交卷，退回" });
+    // 同時送出兩次：第二次不計；扣點用同一個冪等鍵，只扣了一次，不用退
     const first = await quizAttemptFor(env.DB, clientId, session.article_id);
-    return NextResponse.json({ ...(first ? resultFromRow(first) : result), alreadyDone: true, tokens: back }, { status: 409 });
+    return NextResponse.json({ ...(first ? resultFromRow(first) : result), alreadyDone: true, tokens }, { status: 409 });
   }
   return NextResponse.json({ ...result, readSeconds, tokens });
 }

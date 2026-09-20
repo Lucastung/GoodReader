@@ -6,7 +6,11 @@
   // global_fetch_strictly_public：fetch 只能連公網，擋掉內網位址（防 SSRF）
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "goodreader" }],
+  "services": [
+    { "binding": "WORKER_SELF_REFERENCE", "service": "goodreader" },
+    // lucasact 帳號服務：登入、Token 錢包（Service Binding，不經過公網）
+    { "binding": "ACCOUNTS", "service": "accounts", "entrypoint": "AccountsService" }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -23,7 +27,9 @@
     "GRADER_MODEL": "deepseek-ai/DeepSeek-V4-Flash",
     "KEYPOINT_MODEL": "deepseek-ai/DeepSeek-V4-Flash",
     "RUBRIC_VERSION": "2026-09-demo-1",
-    "LLM_MOCK": "0"
+    "LLM_MOCK": "0",
+    "ACCOUNTS_URL": "https://accounts.lucasact.com",
+    "PUBLIC_URL": "https://goodreader.lucasact.com"
   },
   "observability": { "enabled": true }
 }

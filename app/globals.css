@@ -391,3 +391,9 @@ button.pid:hover { border-color: var(--accent); color: var(--accent); }
 .quiz .actions .ghost { margin-top: 0; }
 .mode-seg button { display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
 .mode-seg button small { font-size: 0.72rem; color: var(--muted); font-weight: 400; }
+
+/* 登入：Google 按鈕 */
+.login .google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin: 6px 0 14px; }
+.login .google-btn svg { background: #fff; border-radius: 50%; padding: 2px; }
+.login .google-btn.disabled { opacity: 0.5; pointer-events: none; }
+.login .gift { margin-bottom: 10px; }

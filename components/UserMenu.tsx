@@ -5,28 +5,27 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import { Avatar } from "./Avatar";
 
-type Me = { id: string; nickname: string; avatarVersion: number; tokens: number } | null;
+type Me = { id: string; nickname: string; avatarUrl: string; avatarVersion: number; tokens: number; unlimited: boolean } | null;
 
 /** 其他頁面改了 Token／頭像／暱稱時呼叫，頁首會重新讀取 */
 export const refreshUserMenu = () => window.dispatchEvent(new Event("gr:me-changed"));
 
 export function UserMenu() {
   const [me, setMe] = useState<Me | undefined>(undefined);
+  const [logoutUrl, setLogoutUrl] = useState("/");
 
   useEffect(() => {
     const load = () =>
-      api<{ user: Me }>("/api/auth/me")
-        .then((r) => setMe(r.user))
+      api<{ user: Me; logout: string }>("/api/auth/me")
+        .then((r) => {
+          setMe(r.user);
+          setLogoutUrl(r.logout);
+        })
         .catch(() => setMe(null));
     load();
     window.addEventListener("gr:me-changed", load);
     return () => window.removeEventListener("gr:me-changed", load);
   }, []);
-
-  async function logout() {
-    await api("/api/auth/logout", { method: "POST" }).catch(() => {});
-    window.location.href = "/";
-  }
 
   return (
     <div className="user-menu">
@@ -36,15 +35,15 @@ export function UserMenu() {
       {me === undefined ? null : me ? (
         <>
           <Link href="/me" className="token-chip" title="Token 餘額，點開看紀錄">
-            🪙 {me.tokens}
+            🪙 {me.unlimited ? "∞" : me.tokens}
           </Link>
           <Link href="/me" className="me-link" title="個人資料">
-            <Avatar nickname={me.nickname} version={me.avatarVersion} size={28} />
+            <Avatar nickname={me.nickname} version={me.avatarVersion} src={me.avatarVersion > 0 ? null : me.avatarUrl || null} size={28} />
             <span className="who">{me.nickname}</span>
           </Link>
-          <button className="linkish" onClick={logout}>
+          <a className="linkish" href={logoutUrl} title="登出 LUCAS 帳號（lucasact.com 各應用都會登出）">
             登出
-          </button>
+          </a>
         </>
       ) : (
         <Link href="/login" className="linkish">

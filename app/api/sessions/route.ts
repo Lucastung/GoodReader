@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const done = await quizAttemptFor(env.DB, clientId, articleId);
     if (done) return NextResponse.json({ sessionId: done.session_id, done: true });
   }
-  if (user.tokens < GRADE_COST) return jsonError(402, `Token 不足：每次評分需要 ${GRADE_COST} 個 Token`);
+  if (!user.unlimited && user.tokens < GRADE_COST) return jsonError(402, `Token 不足：每次評分需要 ${GRADE_COST} 個 Token`);
 
   const exclude = await recentArticleIds(env.DB, clientId);
   const quizDone = mode === "basic" ? await quizDoneArticleIds(env.DB, clientId) : [];

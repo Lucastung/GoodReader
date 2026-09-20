@@ -7,7 +7,7 @@ export async function GET(req: Request) {
   const env = cfEnv();
   const denied = checkAccess(req, env);
   if (denied) return denied;
-  const [articles, user] = await Promise.all([listArticles(env.DB), currentUser(req, env.DB)]);
+  const [articles, user] = await Promise.all([listArticles(env.DB), currentUser(req, env)]);
   // 登入時附上每篇的成績（best＝進階最高分，quiz＝閱讀測驗分數），清單上標「已評」
   const bests = user ? await articleBests(env.DB, user.id) : {};
   return NextResponse.json({ articles: articles.map((a) => ({ ...a, best: bests[a.id]?.advanced ?? null, quiz: bests[a.id]?.basic ?? null })) });

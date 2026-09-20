@@ -26,6 +26,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     startedAt: session.started_at,
     article,
     tokens: user.tokens,
+    unlimited: user.unlimited,
   };
 
   if (session.mode === "basic") {

@@ -6,8 +6,9 @@ import { ApiError, api } from "@/lib/client";
 import { AvatarPicker } from "@/components/AvatarPicker";
 import { refreshUserMenu } from "@/components/UserMenu";
 
-type Me = { id: string; nickname: string; gradeLevel: string | null; bio: string | null; avatarVersion: number; tokens: number };
-type Ledger = { id: string; delta: number; balance_after: number; reason: string; note: string | null; created_at: string };
+type Me = { id: string; nickname: string; avatarUrl: string; gradeLevel: string | null; bio: string | null; avatarVersion: number; tokens: number; unlimited: boolean };
+type Ledger = { id: string; label: string; delta: number; balance_after: number; app: string; note: string; created_at: string };
+type Balance = { monthly: number; bought: number; total: number; allowance: number; unlimited: boolean };
 
 const GRADE_OPTIONS = [
   ["j1", "國一"],
@@ -17,13 +18,12 @@ const GRADE_OPTIONS = [
   ["s2", "高二"],
   ["s3", "高三"],
 ] as const;
-const REASON: Record<string, string> = { signup: "註冊禮", grade: "評分", refund: "評分失敗退回", admin: "管理者調整", purchase: "購買" };
+const APP_LABEL: Record<string, string> = { goodreader: "好好讀書", freescript: "FreeScript", fishon: "FishOn", lucasact: "lucasact" };
 const fmt = (s: string) => new Date(s.replace(" ", "T") + "Z").toLocaleString("zh-TW", { hour12: false, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export default function MePage() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
-  const [tokens, setTokens] = useState<{ balance: number; history: Ledger[]; gradeCost: number } | null>(null);
-  const [nickname, setNickname] = useState("");
+  const [tokens, setTokens] = useState<{ balance: Balance; history: Ledger[]; gradeCost: number } | null>(null);
   const [gradeLevel, setGradeLevel] = useState("");
   const [bio, setBio] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -35,7 +35,6 @@ export default function MePage() {
       const r = await api<{ user: Me | null }>("/api/auth/me");
       setMe(r.user);
       if (!r.user) return;
-      setNickname(r.user.nickname);
       setGradeLevel(r.user.gradeLevel ?? "");
       setBio(r.user.bio ?? "");
       setTokens(await api("/api/me/tokens"));
@@ -52,13 +51,13 @@ export default function MePage() {
     return (
       <div className="card narrow">
         <p>請先登入。</p>
-        <Link href="/login?next=/me" className="primary" style={{ textDecoration: "none", display: "inline-block" }}>
+        <Link href="/login?next=%2Fme" className="primary" style={{ textDecoration: "none", display: "inline-block" }}>
           登入
         </Link>
       </div>
     );
 
-  const dirty = nickname.trim() !== me.nickname || gradeLevel !== (me.gradeLevel ?? "") || bio.trim() !== (me.bio ?? "");
+  const dirty = gradeLevel !== (me.gradeLevel ?? "") || bio.trim() !== (me.bio ?? "");
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -67,7 +66,7 @@ export default function MePage() {
     try {
       await api("/api/me/profile", {
         method: "PUT",
-        body: JSON.stringify({ nickname: nickname.trim(), gradeLevel: gradeLevel || null, bio: bio.trim() || null }),
+        body: JSON.stringify({ gradeLevel: gradeLevel || null, bio: bio.trim() || null }),
       });
       setMsg({ ok: true, text: "已儲存" });
       await load();
@@ -106,13 +105,18 @@ export default function MePage() {
     <div className="profile">
       <section className="card">
         <h2 style={{ marginTop: 0 }}>個人資料</h2>
-        <AvatarPicker nickname={me.nickname} version={me.avatarVersion} preview={null} onPick={uploadAvatar} onRemove={removeAvatar} busy={busy} />
+        <AvatarPicker nickname={me.nickname} version={me.avatarVersion} preview={me.avatarVersion > 0 ? null : me.avatarUrl || null} onPick={uploadAvatar} onRemove={removeAvatar} busy={busy} />
         {avatarMsg && <p className={`msg small ${avatarMsg.ok ? "" : "error"}`}>{avatarMsg.text}</p>}
         <form className="profile-form" onSubmit={save} style={{ marginTop: 14 }}>
-          <label>
-            暱稱（登入用）
-            <input value={nickname} maxLength={20} onChange={(e) => setNickname(e.target.value)} required />
-          </label>
+          <div>
+            <div className="muted small">名稱</div>
+            <div>
+              <b>{me.nickname}</b>{" "}
+              <a className="small" href="https://lucasact.com/" title="名稱與帳號在 lucasact.com 管理">
+                在 lucasact.com 修改
+              </a>
+            </div>
+          </div>
           <label>
             年級
             <select value={gradeLevel} onChange={(e) => setGradeLevel(e.target.value)}>
@@ -129,7 +133,7 @@ export default function MePage() {
             <input value={bio} maxLength={60} onChange={(e) => setBio(e.target.value)} placeholder="例：喜歡讀推理小說" />
           </label>
           <p className="muted small" style={{ margin: 0 }}>
-            請不要填真實姓名、學校、電話或地址。改了暱稱，下次要用新暱稱登入。
+            請不要填學校、電話或地址。
           </p>
           <div className="row" style={{ alignItems: "center" }}>
             <button className="primary" disabled={busy || !dirty}>
@@ -144,20 +148,28 @@ export default function MePage() {
         <div className="token-head">
           <div>
             <div className="muted small">Token 餘額</div>
-            <div className="token-big">🪙 {tokens?.balance ?? me.tokens}</div>
+            <div className="token-big">🪙 {me.unlimited ? "不限" : (tokens?.balance.total ?? me.tokens)}</div>
+            {tokens && !tokens.balance.unlimited && (
+              <div className="muted small">
+                本月發放 {tokens.balance.monthly}／{tokens.balance.allowance}・購買與轉贈 {tokens.balance.bought}
+              </div>
+            )}
           </div>
-          <button className="btn-outline" disabled title="即將推出">
-            購買 Token（即將推出）
-          </button>
+          <a className="btn-outline as-button" href="https://lucasact.com/token.html">
+            加值／轉贈
+          </a>
         </div>
-        <p className="muted small">每次送出評分用 {tokens?.gradeCost ?? 2} 個 Token；評分失敗會自動退回。</p>
+        <p className="muted small">
+          每次送出評分用 {tokens?.gradeCost ?? 2} 個 Token；評分失敗會自動退回。Token 是 LUCAS 各應用共用的，每月 1 日補發本月的額度。
+        </p>
         <h3>最近紀錄</h3>
         <ul className="ledger">
           {tokens?.history.map((h) => (
             <li key={h.id}>
               <span className="what">
-                {REASON[h.reason] ?? h.reason}
-                {h.note && h.reason !== "signup" ? `：${h.note}` : ""}
+                {h.label}
+                {h.note ? `：${h.note}` : ""}
+                {h.app && h.app !== "goodreader" ? `（${APP_LABEL[h.app] ?? h.app}）` : ""}
                 <small>
                   {fmt(h.created_at)}・餘額 {h.balance_after}
                 </small>

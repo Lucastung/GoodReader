@@ -22,6 +22,7 @@ type SessionData = {
   /** 之前其他次練習這篇的最高分；null = 第一次做 */
   previousBest: number | null;
   tokens: number;
+  unlimited?: boolean;
 };
 
 const NO_PARAGRAPHS: Article["paragraphs"] = [];
@@ -172,10 +173,10 @@ export default function PracticePage() {
         />
         <p className={`count ${sumChars > summaryRange[1] ? "over" : ""}`}>{sumChars} 字</p>
 
-        <button className="primary big" onClick={submit} disabled={submitting || data.tokens < GRADE_COST}>
+        <button className="primary big" onClick={submit} disabled={submitting || (!data.unlimited && data.tokens < GRADE_COST)}>
           {submitting
             ? "老師批改中…（約 10–30 秒）"
-            : `${result ? "修改後再評一次" : "送出評分"}（用 ${GRADE_COST} Token，剩 ${data.tokens}）`}
+            : `${result ? "修改後再評一次" : "送出評分"}${data.unlimited ? "" : `（用 ${GRADE_COST} Token，剩 ${data.tokens}）`}`}
         </button>
         {submitError && <p className="error">{submitError}</p>}
       </section>

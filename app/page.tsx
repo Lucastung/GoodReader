@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ApiError, api, getPref, setAccessCode, setPref } from "@/lib/client";
 import type { Stats } from "@/lib/db";
 
-type Me = { id: string; nickname: string; hasParentPin: boolean; gradeLevel: string | null; tokens: number } | null;
+type Me = { id: string; nickname: string; gradeLevel: string | null; tokens: number; unlimited: boolean } | null;
 type ArticleItem = {
   id: string;
   title: string;
@@ -64,7 +64,7 @@ export default function Home() {
 
   async function start(articleId?: string) {
     if (!me) {
-      window.location.href = "/login?next=/";
+      window.location.href = "/login";
       return;
     }
     setBusy(true);
@@ -118,34 +118,27 @@ export default function Home() {
     <div className="home">
       {welcome && me && (
         <p className="gift" role="status">
-          🎉 歡迎，{me.nickname}！已送你 {me.tokens} 個 Token，每次評分用 2 個。選一篇文章開始吧。
+          🎉 歡迎，{me.nickname}！你有 {me.unlimited ? "不限" : me.tokens} 個 Token，每次評分用 2 個。選一篇文章開始吧。
         </p>
       )}
-      {me && me.tokens < 2 && (
+      {me && !me.unlimited && me.tokens < 2 && (
         <p className="error small" role="status">
-          Token 不足（剩 {me.tokens} 個），暫時不能評分。
+          Token 不足（剩 {me.tokens} 個），暫時不能評分。每月 1 日會補發，或到{" "}
+          <a href="https://lucasact.com/token.html">lucasact.com</a> 加值。
         </p>
       )}
       {me === undefined ? (
         <section className="card dash muted">載入中…</section>
       ) : me ? (
-        <Dashboard
-          stats={stats}
-          mode={mode}
-          hasParentPin={me.hasParentPin}
-          onChange={(s) => {
-            setStats(s);
-            setMe({ ...me, hasParentPin: true });
-          }}
-        />
+        <Dashboard stats={stats} mode={mode} onChange={setStats} />
       ) : (
         <section className="card dash login-cta">
           <div>
             <b>登入後開始累積積分</b>
-            <p className="muted small">用暱稱＋PIN 建立帳號，換手機或電腦都看得到自己的成績。</p>
+            <p className="muted small">用 Google 帳號登入，換手機或電腦都看得到自己的成績。</p>
           </div>
           <a className="primary as-button" href="/login">
-            登入／建立帳號
+            登入
           </a>
         </section>
       )}
@@ -223,17 +216,13 @@ function gradeFor(gradeLevel: string | null | undefined, mode: Mode): "junior" |
 function Dashboard({
   stats,
   mode,
-  hasParentPin,
   onChange,
 }: {
   stats: Stats | null;
   mode: Mode;
-  hasParentPin: boolean;
   onChange: (s: Stats) => void;
 }) {
   const [amount, setAmount] = useState("");
-  const [parentPin, setParentPin] = useState("");
-  const [parentPin2, setParentPin2] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -250,12 +239,8 @@ function Dashboard({
   const pts = Number(amount);
   const valid = Number.isInteger(pts) && pts > 0 && pts <= s.remaining;
 
-  const pinOk = /^\d{4,6}$/.test(parentPin) && (hasParentPin || parentPin === parentPin2);
-
   function cancel() {
     setConfirming(false);
-    setParentPin("");
-    setParentPin2("");
   }
 
   async function redeem() {
@@ -264,7 +249,7 @@ function Dashboard({
     try {
       const next = await api<Stats>("/api/me/redeem", {
         method: "POST",
-        body: JSON.stringify({ points: pts, parentPin, setupParentPin: !hasParentPin }),
+        body: JSON.stringify({ points: pts }),
       });
       onChange(next);
       setMsg(`已扣除 ${pts} 點`);
@@ -272,7 +257,6 @@ function Dashboard({
       cancel();
     } catch (e) {
       setMsg((e as Error).message);
-      setParentPin("");
     } finally {
       setSaving(false);
     }
@@ -306,36 +290,11 @@ function Dashboard({
               className="redeem-confirm"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (pinOk) redeem();
+                redeem();
               }}
             >
-              <span className="small">
-                扣除 {pts} 點。{hasParentPin ? "請家長輸入 PIN：" : "第一次扣除，請家長設定 PIN（4–6 位數字）："}
-              </span>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={6}
-                value={parentPin}
-                onChange={(e) => setParentPin(e.target.value.replace(/\D/g, ""))}
-                placeholder="家長 PIN"
-                aria-label="家長 PIN"
-                autoComplete="off"
-                autoFocus
-              />
-              {!hasParentPin && (
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={parentPin2}
-                  onChange={(e) => setParentPin2(e.target.value.replace(/\D/g, ""))}
-                  placeholder="再輸入一次"
-                  aria-label="再輸入一次家長 PIN"
-                  autoComplete="off"
-                />
-              )}
-              <button className="primary" disabled={saving || !pinOk}>
+              <span className="small">確定扣除 {pts} 點？</span>
+              <button className="primary" disabled={saving} autoFocus>
                 {saving ? "處理中…" : "確定扣除"}
               </button>
               <button type="button" className="ghost" onClick={cancel} disabled={saving}>
