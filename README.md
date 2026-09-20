@@ -153,7 +153,7 @@ npm test                          # 評分邏輯、大綱轉換、收集器抽�
 2. **Settings → Authentication → Login methods**：確認有 **One-time PIN**。
 3. **Access → Applications → Add an application → Self-hosted**：
    - Application name：`GoodReader 後台`
-   - Destinations：`goodreader.gkb4u.com` 路徑 `admin`，再加一筆路徑 `api/admin`（兩個都要）
+   - Destinations：`goodreader.lucasact.com` 路徑 `admin`，再加一筆路徑 `api/admin`（兩個都要）
    - Session duration：24 hours
 4. Policy：Action **Allow**，Include → **Emails**，填入管理者與審稿老師的 email。
 5. 存檔後在應用程式的 **Overview** 複製 **Application Audience (AUD) Tag**。
@@ -161,7 +161,7 @@ npm test                          # 評分邏輯、大綱轉換、收集器抽�
    - `ACCESS_TEAM_DOMAIN`：`<團隊名稱>.cloudflareaccess.com`
    - `ACCESS_AUD`：上一步的 AUD Tag
    - `ADMIN_EMAILS`：你的 email（逗號分隔可放多個）
-7. 開 `https://goodreader.gkb4u.com/admin`，輸入 email、收驗證碼登入。
+7. 開 `https://goodreader.lucasact.com/admin`，輸入 email、收驗證碼登入。
 
 之後要加審稿老師：Access policy 加上老師的 email，再到後台「權限」頁把他設成審稿老師（兩道鎖：Access 管能不能登入，後台名單管能做什麼）。
 

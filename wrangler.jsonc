@@ -12,7 +12,7 @@
       "binding": "DB",
       "database_name": "goodreader-db",
       // 執行 `npx wrangler d1 create goodreader-db` 後把 id 貼到這裡
-      "database_id": "ad03803d-e969-4adf-88db-ab518c48563d",
+      "database_id": "d0805e0a-4ffb-4576-bcdb-c9e92df88a19",
       "migrations_dir": "migrations"
     }
   ],
