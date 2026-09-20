@@ -254,48 +254,136 @@ const IMPORT_EXAMPLE = `[
   }
 ]`;
 
+const IMPORT_BATCH = 100; // 與 /api/admin/articles/import 上限一致
+
+/** 接受 JSON 陣列或 { articles: [...] } */
+function toList(body: unknown): unknown[] | null {
+  if (Array.isArray(body)) return body;
+  const a = (body as { articles?: unknown } | null)?.articles;
+  return Array.isArray(a) ? a : null;
+}
+
 function ImportPanel({ onDone }: { onDone: () => void }) {
   const [text, setText] = useState("");
+  const [files, setFiles] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [drag, setDrag] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  async function loadFiles(list: FileList | null) {
+    if (!list?.length) return;
+    setMsg(null);
+    const merged: unknown[] = [];
+    const names: string[] = [];
+    for (const f of Array.from(list)) {
+      if (!/\.json$/i.test(f.name)) {
+        setMsg({ ok: false, text: `${f.name} 不是 .json 檔` });
+        return;
+      }
+      let items: unknown[] | null = null;
+      try {
+        items = toList(JSON.parse(await f.text()));
+      } catch {
+        /* 下面統一報錯 */
+      }
+      if (!items) {
+        setMsg({ ok: false, text: `${f.name} 不是有效的 JSON 陣列` });
+        return;
+      }
+      merged.push(...items);
+      names.push(`${f.name}（${items.length} 篇）`);
+    }
+    setFiles(names);
+    setText(JSON.stringify(merged, null, 2));
+  }
+
   async function go() {
-    let body: unknown;
+    let list: unknown[] | null = null;
     try {
-      body = JSON.parse(text);
+      list = toList(JSON.parse(text));
     } catch {
-      setMsg({ ok: false, text: "JSON 格式錯誤，請檢查逗號與引號" });
+      /* 下面統一報錯 */
+    }
+    if (!list) {
+      setMsg({ ok: false, text: "JSON 格式錯誤，請檢查逗號與引號（需要是陣列）" });
+      return;
+    }
+    if (!list.length) {
+      setMsg({ ok: false, text: "沒有文章可匯入" });
       return;
     }
     setBusy(true);
     setMsg(null);
+    let created = 0;
+    const skipped: string[] = [];
     try {
-      const r = await api<{ created: string[]; skipped: { index: number; title?: string; reason: string }[] }>(
-        "/api/admin/articles/import",
-        { method: "POST", body: JSON.stringify(body) },
-      );
+      // 超過 100 篇自動分批送出
+      for (let start = 0; start < list.length; start += IMPORT_BATCH) {
+        const r = await api<{ created: string[]; skipped: { index: number; title?: string; reason: string }[] }>(
+          "/api/admin/articles/import",
+          { method: "POST", body: JSON.stringify(list.slice(start, start + IMPORT_BATCH)) },
+        );
+        created += r.created.length;
+        skipped.push(...r.skipped.map((s) => `#${start + s.index + 1} ${s.title ?? ""} ${s.reason}`));
+      }
       setMsg({
-        ok: !r.skipped.length,
-        text:
-          `匯入 ${r.created.length} 篇（草稿）` +
-          (r.skipped.length ? `；略過 ${r.skipped.length} 篇：` + r.skipped.map((s) => `#${s.index + 1} ${s.title ?? ""} ${s.reason}`).join("；") : ""),
+        ok: !skipped.length,
+        text: `匯入 ${created} 篇（草稿）` + (skipped.length ? `；略過 ${skipped.length} 篇：` + skipped.join("；") : ""),
       });
-      if (r.created.length) onDone();
     } catch (e) {
-      setMsg({ ok: false, text: (e as Error).message });
+      setMsg({ ok: false, text: `${created ? `已匯入 ${created} 篇後中斷：` : ""}${(e as Error).message}` });
     } finally {
       setBusy(false);
+      if (created) onDone();
     }
   }
 
   return (
-    <div className="panel">
+    <div
+      className="panel"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDrag(true);
+      }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDrag(false);
+        loadFiles(e.dataTransfer.files);
+      }}
+      style={drag ? { outline: "2px dashed var(--accent)", outlineOffset: -4 } : undefined}
+    >
       <h3>批次匯入</h3>
       <p className="small muted">
-        貼上 JSON 陣列（格式同 data/classics.json），一次最多 100 篇，全部存成待審草稿。每個元素一段文字；genre 可用：{GENRES.join("、")}；license
+        上傳 .json 檔（可多選，或直接拖進這個框），或貼上 JSON 陣列（格式同 data/classics.json）。全部存成待審草稿，超過 100 篇會自動分批；id 重複的會略過。每個元素一段文字；genre 可用：{GENRES.join("、")}；license
         可用：public-domain、cc-by、cc-by-sa、authorized、original。
       </p>
-      <textarea rows={10} value={text} placeholder={IMPORT_EXAMPLE} onChange={(e) => setText(e.target.value)} style={{ fontFamily: "monospace", fontSize: "0.85rem" }} />
+      <div className="toolbar" style={{ marginBottom: 8 }}>
+        <label className="btn sm" style={{ cursor: "pointer" }}>
+          選擇檔案…
+          <input
+            type="file"
+            accept=".json,application/json"
+            multiple
+            hidden
+            onChange={(e) => {
+              loadFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {files.length > 0 && <span className="small muted">已載入：{files.join("、")}</span>}
+      </div>
+      <textarea
+        rows={10}
+        value={text}
+        placeholder={IMPORT_EXAMPLE}
+        onChange={(e) => {
+          setText(e.target.value);
+          setFiles([]);
+        }}
+        style={{ fontFamily: "monospace", fontSize: "0.85rem" }}
+      />
       <div className="toolbar" style={{ marginTop: 8 }}>
         <button className="primary sm" disabled={busy || !text.trim()} onClick={go}>
           {busy ? "匯入中…" : "匯入"}
