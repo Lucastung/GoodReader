@@ -1,0 +1,354 @@
+{
+  "_說明": "要從維基文庫收集的篇目。titles 依序嘗試（第一個找到且不是消歧義頁的就用）。改完重跑 scripts/collect-wikisource.command。已在 classics.json 的篇目不必列。 超過 maxChars 字（只算漢字）的篇目不收。",
+  "items": [
+    {
+      "id": "lou-shi-ming",
+      "titles": [
+        "陋室銘"
+      ],
+      "author": "劉禹錫",
+      "era": "唐",
+      "genre": "文言文",
+      "difficulty": 1
+    },
+    {
+      "id": "mai-you-weng",
+      "titles": [
+        "賣油翁"
+      ],
+      "author": "歐陽脩",
+      "era": "北宋",
+      "genre": "文言文",
+      "difficulty": 1
+    },
+    {
+      "id": "ma-shuo",
+      "titles": [
+        "馬說",
+        "雜說四"
+      ],
+      "author": "韓愈",
+      "era": "唐",
+      "genre": "文言文",
+      "difficulty": 2
+    },
+    {
+      "id": "wu-liu-xiansheng-zhuan",
+      "titles": [
+        "五柳先生傳"
+      ],
+      "author": "陶淵明",
+      "era": "東晉",
+      "genre": "文言文",
+      "difficulty": 2
+    },
+    {
+      "id": "wei-xue",
+      "titles": [
+        "為學一首示子姪",
+        "為學"
+      ],
+      "author": "彭端淑",
+      "era": "清",
+      "genre": "文言文",
+      "difficulty": 2
+    },
+    {
+      "id": "shang-zhong-yong",
+      "titles": [
+        "傷仲永"
+      ],
+      "author": "王安石",
+      "era": "北宋",
+      "genre": "文言文",
+      "difficulty": 2
+    },
+    {
+      "id": "xiao-shi-tan-ji",
+      "titles": [
+        "至小丘西小石潭記",
+        "小石潭記"
+      ],
+      "author": "柳宗元",
+      "era": "唐",
+      "genre": "文言文",
+      "difficulty": 2
+    },
+    {
+      "id": "shi-de-xi-shan",
+      "titles": [
+        "始得西山宴遊記",
+        "始得西山宴游記"
+      ],
+      "author": "柳宗元",
+      "era": "唐",
+      "genre": "文言文",
+      "difficulty": 3
+    },
+    {
+      "id": "da-tie-chui-zhuan",
+      "titles": [
+        "大鐵椎傳"
+      ],
+      "author": "魏禧",
+      "era": "清",
+      "genre": "文言文",
+      "difficulty": 3
+    },
+    {
+      "id": "mai-gan-zhe-yan",
+      "titles": [
+        "賣柑者言"
+      ],
+      "author": "劉基",
+      "era": "明",
+      "genre": "文言文",
+      "difficulty": 3
+    },
+    {
+      "id": "lan-ting-ji-xu",
+      "titles": [
+        "蘭亭集序",
+        "蘭亭序"
+      ],
+      "author": "王羲之",
+      "era": "東晉",
+      "genre": "文言文",
+      "difficulty": 3
+    },
+    {
+      "id": "wan-you-liu-qiao",
+      "titles": [
+        "晚遊六橋待月記"
+      ],
+      "author": "袁宏道",
+      "era": "明",
+      "genre": "文言文",
+      "difficulty": 3
+    },
+    {
+      "id": "huang-zhou-kuai-zai-ting",
+      "titles": [
+        "黃州快哉亭記"
+      ],
+      "author": "蘇轍",
+      "era": "北宋",
+      "genre": "文言文",
+      "difficulty": 4
+    },
+    {
+      "id": "qiu-sheng-fu",
+      "titles": [
+        "秋聲賦"
+      ],
+      "author": "歐陽脩",
+      "era": "北宋",
+      "genre": "文言文",
+      "difficulty": 4
+    },
+    {
+      "id": "jian-zhu-ke-shu",
+      "titles": [
+        "諫逐客書"
+      ],
+      "author": "李斯",
+      "era": "秦",
+      "genre": "文言文",
+      "difficulty": 4
+    },
+    {
+      "id": "chen-qing-biao",
+      "titles": [
+        "陳情表 (西晉)",
+        "陳情表 (李密)",
+        "陳情表"
+      ],
+      "author": "李密",
+      "era": "西晉",
+      "genre": "文言文",
+      "difficulty": 4
+    },
+    {
+      "id": "xiang-ji-xuan-zhi",
+      "titles": [
+        "項脊軒志"
+      ],
+      "author": "歸有光",
+      "era": "明",
+      "genre": "文言文",
+      "difficulty": 4
+    },
+    {
+      "id": "zuo-zhong-yi-gong",
+      "titles": [
+        "左忠毅公軼事",
+        "左忠毅公逸事"
+      ],
+      "author": "方苞",
+      "era": "清",
+      "genre": "文言文",
+      "difficulty": 4
+    },
+    {
+      "id": "quan-he-lun",
+      "titles": [
+        "勸和論"
+      ],
+      "author": "鄭用錫",
+      "era": "清",
+      "genre": "文言文",
+      "difficulty": 4
+    },
+    {
+      "id": "chun-zhu-ziqing",
+      "titles": [
+        "春 (朱自清)",
+        "春（朱自清）"
+      ],
+      "author": "朱自清",
+      "era": "現代",
+      "genre": "散文",
+      "difficulty": 1
+    },
+    {
+      "id": "xun-jian-shi-kang",
+      "titles": [
+        "訓儉示康"
+      ],
+      "author": "司馬光",
+      "era": "北宋",
+      "genre": "文言文",
+      "difficulty": 4
+    },
+    {
+      "id": "tai-wan-tong-shi-xu",
+      "titles": [
+        "臺灣通史/自序",
+        "臺灣通史序 (連橫)",
+        "臺灣通史/序"
+      ],
+      "author": "連橫",
+      "era": "民國",
+      "genre": "文言文",
+      "difficulty": 4
+    },
+    {
+      "id": "ji-shi-er-lang-wen",
+      "titles": [
+        "祭十二郎文"
+      ],
+      "author": "韓愈",
+      "era": "唐",
+      "genre": "文言文",
+      "difficulty": 5
+    },
+    {
+      "id": "yuan-jun",
+      "titles": [
+        "原君",
+        "明夷待訪錄/原君"
+      ],
+      "author": "黃宗羲",
+      "era": "清",
+      "genre": "文言文",
+      "difficulty": 5
+    },
+    {
+      "id": "bei-ying",
+      "titles": [
+        "背影",
+        "背影 (朱自清)"
+      ],
+      "author": "朱自清",
+      "era": "現代",
+      "genre": "散文",
+      "difficulty": 2
+    },
+    {
+      "id": "he-tang-yue-se",
+      "titles": [
+        "荷塘月色"
+      ],
+      "author": "朱自清",
+      "era": "現代",
+      "genre": "散文",
+      "difficulty": 3
+    },
+    {
+      "id": "cha-bu-duo-xiansheng",
+      "titles": [
+        "差不多先生傳"
+      ],
+      "author": "胡適",
+      "era": "現代",
+      "genre": "記敘文",
+      "difficulty": 1
+    },
+    {
+      "id": "wo-de-mu-qin-hushi",
+      "titles": [
+        "我的母親 (胡適)",
+        "四十自述/我的母親",
+        "我的母親"
+      ],
+      "author": "胡適",
+      "era": "現代",
+      "genre": "記敘文",
+      "difficulty": 2
+    },
+    {
+      "id": "zui-ku-yu-zui-le",
+      "titles": [
+        "最苦與最樂"
+      ],
+      "author": "梁啟超",
+      "era": "現代",
+      "genre": "議論文",
+      "difficulty": 2
+    },
+    {
+      "id": "kong-yi-ji",
+      "titles": [
+        "孔乙己"
+      ],
+      "author": "魯迅",
+      "era": "現代",
+      "genre": "記敘文",
+      "difficulty": 3
+    },
+    {
+      "id": "gu-xiang-luxun",
+      "titles": [
+        "故鄉 (魯迅)",
+        "吶喊/故鄉",
+        "故鄉"
+      ],
+      "author": "魯迅",
+      "era": "現代",
+      "genre": "記敘文",
+      "difficulty": 4
+    },
+    {
+      "id": "yi-gan-cheng-zai",
+      "titles": [
+        "一桿「稱仔」",
+        "一桿稱仔"
+      ],
+      "author": "賴和",
+      "era": "現代",
+      "genre": "記敘文",
+      "difficulty": 3
+    },
+    {
+      "id": "fei-leng-cui-shan-ju",
+      "titles": [
+        "翡冷翠山居閒話"
+      ],
+      "author": "徐志摩",
+      "era": "現代",
+      "genre": "散文",
+      "difficulty": 3
+    }
+  ],
+  "maxChars": 2400
+}
