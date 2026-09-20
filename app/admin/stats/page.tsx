@@ -17,7 +17,7 @@ type Stats = {
   prices: Record<string, { in: number; out: number }>;
 };
 
-const KIND: Record<string, string> = { grade: "評分", keypoints: "要點底稿", generate: "AI 撰寫範文" };
+const KIND: Record<string, string> = { grade: "評分", keypoints: "要點底稿", generate: "AI 撰寫範文", quiz: "閱讀測驗出題" };
 const usd = (n: number) => (n === 0 ? "$0" : n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
 const int = (n: number) => n.toLocaleString("en-US");
 

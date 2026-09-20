@@ -37,6 +37,7 @@ export async function DELETE(req: Request, { params }: Ctx) {
   if (used?.n) return jsonError(409, `已有 ${used.n} 次練習用過這篇，不能刪除，請改成下架`);
   await env.DB.batch([
     env.DB.prepare("DELETE FROM article_keypoints WHERE article_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM article_quizzes WHERE article_id = ?").bind(id),
     env.DB.prepare("DELETE FROM articles WHERE id = ?").bind(id),
   ]);
   await audit(env.DB, a, "article.delete", id);

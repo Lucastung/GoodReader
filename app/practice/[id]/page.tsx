@@ -2,11 +2,13 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, api, getPref, setPref } from "@/lib/client";
+import { ApiError, api, getPref } from "@/lib/client";
 import type { Article } from "@/lib/db";
 import { rowsToTree, type OutlineRow } from "@/lib/outline";
 import { OutlineEditor, ResultView, type AttemptResult } from "@/components/practice";
-import { MicButton, ReadAloudBar, useDictationTarget, useReadAloud } from "@/components/speech";
+import { MicButton, useDictationTarget, useReadAloud } from "@/components/speech";
+import { ArticleReader } from "@/components/reader";
+import { QuizPractice, type QuizSessionData } from "@/components/quiz";
 import { refreshUserMenu } from "@/components/UserMenu";
 
 const GRADE_COST = 2;
@@ -14,6 +16,7 @@ const GRADE_COST = 2;
 type SessionData = {
   sessionId: string;
   grade: "junior" | "senior";
+  mode: "advanced";
   article: Article;
   summaryRange: [number, number];
   /** 之前其他次練習這篇的最高分；null = 第一次做 */
@@ -28,6 +31,7 @@ export default function PracticePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [data, setData] = useState<SessionData | null>(null);
+  const [quizData, setQuizData] = useState<QuizSessionData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rows, setRows] = useState<OutlineRow[]>([{ text: "", level: 0 }]);
   const [summary, setSummary] = useState("");
@@ -45,8 +49,12 @@ export default function PracticePage() {
   const loaded = useRef(false);
 
   useEffect(() => {
-    api<SessionData>(`/api/sessions/${id}`)
+    api<SessionData | QuizSessionData>(`/api/sessions/${id}`)
       .then((d) => {
+        if (d.mode === "basic") {
+          setQuizData(d);
+          return;
+        }
         setData(d);
         try {
           const raw = localStorage.getItem(draftKey);
@@ -112,12 +120,13 @@ export default function PracticePage() {
     if (!data) return;
     const r = await api<{ sessionId: string }>("/api/sessions", {
       method: "POST",
-      body: JSON.stringify({ grade: data.grade }),
+      body: JSON.stringify({ grade: data.grade, mode: "advanced" }),
     });
     router.push(`/practice/${r.sessionId}`);
   }
 
   if (loadError) return <p className="error card">{loadError}</p>;
+  if (quizData) return <QuizPractice initial={quizData} />;
   if (!data) return <p className="muted card">載入文章中…</p>;
 
   const { article, summaryRange } = data;
@@ -132,56 +141,13 @@ export default function PracticePage() {
         </p>
       )}
       <div className="work">
-      <article className={`reader card ${hideArticle ? "collapsed" : ""}`}>
-        <div className="reader-head">
-          <div>
-            <h1>{article.title}</h1>
-            <p className="meta">
-              {article.era}・{article.author}・{article.genre}・約 {article.charCount} 字
-            </p>
-          </div>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={hideArticle}
-              onChange={(e) => {
-                setHideArticle(e.target.checked);
-                setPref("closedBook", e.target.checked ? "1" : "0");
-              }}
-            />
-            蓋起原文
-          </label>
-        </div>
-        <ReadAloudBar ctl={reader} />
-        {!hideArticle && (
-          <div className="text">
-            {article.paragraphs.map((p) => (
-              <p
-                key={p.id}
-                id={`para-${p.id}`}
-                className={[highlight === p.id ? "hl" : "", reader.current === p.id ? "reading" : ""].join(" ")}
-              >
-                {reader.supported ? (
-                  <button type="button" className="pid" onClick={() => reader.play(p.id)} title={`從 ${p.id} 開始朗讀`}>
-                    {p.id}
-                  </button>
-                ) : (
-                  <span className="pid">{p.id}</span>
-                )}
-                {p.text}
-              </p>
-            ))}
-          </div>
-        )}
-        <p className="source">
-          {article.license === "public-domain" ? "公有領域作品" : article.license}
-          {article.url && (
-            <>
-              ・<a href={article.url} target="_blank" rel="noreferrer">原文出處</a>
-            </>
-          )}
-        </p>
-      </article>
+      <ArticleReader
+        article={article}
+        reader={reader}
+        hideArticle={hideArticle}
+        onHideChange={setHideArticle}
+        highlight={highlight}
+      />
 
       <section className="answer card">
         <h2>大綱</h2>

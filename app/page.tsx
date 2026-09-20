@@ -6,13 +6,26 @@ import { ApiError, api, getPref, setAccessCode, setPref } from "@/lib/client";
 import type { Stats } from "@/lib/db";
 
 type Me = { id: string; nickname: string; hasParentPin: boolean; gradeLevel: string | null; tokens: number } | null;
-type ArticleItem = { id: string; title: string; author: string; era: string | null; genre: string; difficulty: number; char_count: number; best: number | null };
+type ArticleItem = {
+  id: string;
+  title: string;
+  author: string;
+  era: string | null;
+  genre: string;
+  difficulty: number;
+  char_count: number;
+  /** 進階最高分 */
+  best: number | null;
+  /** 閱讀測驗分數（滿分 25） */
+  quiz: number | null;
+};
+type Mode = "basic" | "advanced";
 
 const GENRE_OPTIONS = ["全部", "文言文", "散文", "記敘文"];
 
 export default function Home() {
   const router = useRouter();
-  const [grade, setGrade] = useState<"junior" | "senior">("junior");
+  const [mode, setMode] = useState<Mode>("basic");
   const [genre, setGenre] = useState("全部");
   const [articles, setArticles] = useState<ArticleItem[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -24,8 +37,9 @@ export default function Home() {
   const [code, setCode] = useState("");
 
   useEffect(() => {
-    const g = getPref("grade");
-    if (g === "junior" || g === "senior") setGrade(g);
+    const m = getPref("mode");
+    if (m === "basic" || m === "advanced") setMode(m);
+    else if (getPref("grade") === "senior") setMode("advanced"); // 舊版記的是國中／高中
     load();
   }, []);
 
@@ -37,8 +51,8 @@ export default function Home() {
       ]);
       setArticles(a.articles);
       setMe(m.user);
-      // 沒選過國中／高中時，依個人資料的年級預設
-      if (m.user?.gradeLevel && !getPref("grade")) setGrade(m.user.gradeLevel.startsWith("s") ? "senior" : "junior");
+      // 沒選過模式時，依個人資料的年級預設：國中→基礎、高中→進階
+      if (m.user?.gradeLevel && !getPref("mode")) setMode(m.user.gradeLevel.startsWith("s") ? "advanced" : "basic");
       if (new URLSearchParams(window.location.search).get("welcome")) setWelcome(true);
       if (m.user) setStats(await api<Stats>("/api/me/stats"));
       setNeedCode(false);
@@ -59,7 +73,8 @@ export default function Home() {
       const r = await api<{ sessionId: string }>("/api/sessions", {
         method: "POST",
         body: JSON.stringify({
-          grade,
+          grade: gradeFor(me.gradeLevel, mode),
+          mode,
           genre: genre === "全部" ? undefined : genre,
           articleId,
         }),
@@ -72,9 +87,9 @@ export default function Home() {
     }
   }
 
-  function chooseGrade(g: "junior" | "senior") {
-    setGrade(g);
-    setPref("grade", g);
+  function chooseMode(m: Mode) {
+    setMode(m);
+    setPref("mode", m);
   }
 
   if (needCode) {
@@ -116,6 +131,7 @@ export default function Home() {
       ) : me ? (
         <Dashboard
           stats={stats}
+          mode={mode}
           hasParentPin={me.hasParentPin}
           onChange={(s) => {
             setStats(s);
@@ -135,15 +151,16 @@ export default function Home() {
       )}
 
       <section className="card picker">
-        <div className="seg" role="radiogroup" aria-label="年級">
+        <div className="seg mode-seg" role="radiogroup" aria-label="練習模式">
           {(
             [
-              ["junior", "國中"],
-              ["senior", "高中"],
+              ["basic", "基礎", "閱讀測驗"],
+              ["advanced", "進階", "大綱＋摘要"],
             ] as const
-          ).map(([v, t]) => (
-            <button key={v} role="radio" aria-checked={grade === v} className={grade === v ? "on" : ""} onClick={() => chooseGrade(v)}>
+          ).map(([v, t, sub]) => (
+            <button key={v} role="radio" aria-checked={mode === v} className={mode === v ? "on" : ""} onClick={() => chooseMode(v)}>
               {t}
+              <small>{sub}</small>
             </button>
           ))}
         </div>
@@ -155,23 +172,30 @@ export default function Home() {
           ))}
         </select>
         <button className="primary" disabled={busy} onClick={() => start()}>
-          {busy ? "抽文章中…" : "隨機抽一篇"}
+          {busy ? (mode === "basic" ? "出題中…" : "抽文章中…") : "隨機抽一篇"}
         </button>
       </section>
       {error && <p className="error">{error}</p>}
 
       <section className="list-pane" aria-label="文章清單">
         <ul className="article-list">
-          {shown.map((a) => (
+          {shown.map((a) => {
+            const done = mode === "basic" ? a.quiz : a.best;
+            return (
             <li key={a.id}>
-              <button className={`article-item ${a.best != null ? "done" : ""}`} disabled={busy} onClick={() => start(a.id)}>
+              <button className={`article-item ${done != null ? "done" : ""}`} disabled={busy} onClick={() => start(a.id)}>
                 <span className="title">
                   {a.title}
-                  {a.best != null && (
-                    <span className="done-mark" title="已評過，積分以這篇的最高分計，重做不會重複加分">
-                      ✓ 已評 {a.best} 分
-                    </span>
-                  )}
+                  {done != null &&
+                    (mode === "basic" ? (
+                      <span className="done-mark" title="閱讀測驗每篇只能作答一次，點進去可以看解析">
+                        ✓ 已測驗 {done}/25
+                      </span>
+                    ) : (
+                      <span className="done-mark" title="已評過，積分以這篇的最高分計，重做不會重複加分">
+                        ✓ 已評 {done} 分
+                      </span>
+                    ))}
                 </span>
                 <span className="meta">
                   {a.era}・{a.author}・{a.genre}・約 {a.char_count} 字
@@ -182,19 +206,28 @@ export default function Home() {
                 </span>
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </section>
     </div>
   );
 }
 
+/** 送給後端的年級（決定抽文章的難度範圍與進階配分）：有填個人資料就照年級，沒填就依模式 */
+function gradeFor(gradeLevel: string | null | undefined, mode: Mode): "junior" | "senior" {
+  if (gradeLevel) return gradeLevel.startsWith("s") ? "senior" : "junior";
+  return mode === "basic" ? "junior" : "senior";
+}
+
 function Dashboard({
   stats,
+  mode,
   hasParentPin,
   onChange,
 }: {
   stats: Stats | null;
+  mode: Mode;
   hasParentPin: boolean;
   onChange: (s: Stats) => void;
 }) {
@@ -205,9 +238,11 @@ function Dashboard({
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const s = stats ?? {
+  const empty = [1, 2, 3, 4, 5].map((d) => ({ difficulty: d, count: 0, avg: null }));
+  const s: Stats = stats ?? {
     completed: 0,
-    byDifficulty: [1, 2, 3, 4, 5].map((d) => ({ difficulty: d, count: 0, avg: null })),
+    byDifficulty: empty,
+    byDifficultyBasic: empty,
     totalPoints: 0,
     redeemed: 0,
     remaining: 0,
@@ -251,7 +286,11 @@ function Dashboard({
           <span className="stat-num">{s.completed}</span>
           <span className="stat-unit">篇</span>
         </div>
-        <DifficultyChart data={s.byDifficulty} />
+        {mode === "basic" ? (
+          <DifficultyChart data={s.byDifficultyBasic ?? empty} max={25} caption="各難度平均分（基礎・閱讀測驗，滿分 25）" />
+        ) : (
+          <DifficultyChart data={s.byDifficulty} max={100} caption="各難度平均評分（進階，滿分 100）" />
+        )}
       </div>
       <div className="dash-row points">
         <div className="stat">
@@ -334,11 +373,11 @@ function Dashboard({
   );
 }
 
-/** 各難度平均分（0–100）直條圖；沒做過的難度顯示「—」 */
-function DifficultyChart({ data }: { data: Stats["byDifficulty"] }) {
+/** 各難度平均分直條圖；沒做過的難度顯示「—」 */
+function DifficultyChart({ data, max, caption }: { data: Stats["byDifficulty"]; max: number; caption: string }) {
   return (
-    <figure className="dchart" aria-label="各難度平均評分">
-      <figcaption>各難度平均評分</figcaption>
+    <figure className="dchart" aria-label={caption}>
+      <figcaption>{caption}</figcaption>
       <div className="dchart-plot">
         {data.map((d) => (
           <div
@@ -348,7 +387,7 @@ function DifficultyChart({ data }: { data: Stats["byDifficulty"] }) {
           >
             <span className="dchart-val">{d.avg ?? "—"}</span>
             <div className="dchart-track">
-              {d.avg != null && <div className="dchart-bar" style={{ height: `${Math.max(2, d.avg)}%` }} />}
+              {d.avg != null && <div className="dchart-bar" style={{ height: `${Math.max(2, (d.avg / max) * 100)}%` }} />}
             </div>
             <span className="dchart-x">{d.difficulty}</span>
           </div>
@@ -356,7 +395,7 @@ function DifficultyChart({ data }: { data: Stats["byDifficulty"] }) {
       </div>
       <span className="dchart-axis">難度</span>
       <table className="sr-only">
-        <caption>各難度平均評分</caption>
+        <caption>{caption}</caption>
         <thead>
           <tr>
             <th>難度</th>

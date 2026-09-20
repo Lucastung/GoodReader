@@ -364,3 +364,30 @@ button.pid:hover { border-color: var(--accent); color: var(--accent); }
 .ledger .d.minus { color: var(--lv-d); }
 .ledger .what { min-width: 0; }
 .ledger .what small { display: block; color: var(--muted); }
+
+/* ---------- 基礎模式：閱讀測驗 ---------- */
+.quiz-list { list-style: decimal; padding-left: 1.4em; margin: 8px 0 0; display: grid; gap: 18px; }
+.quiz-list > li::marker { color: var(--accent); font-weight: 700; }
+.q-stem { margin: 0 0 8px; font-weight: 600; line-height: 1.6; }
+.q-mark { font-weight: 800; margin-right: 6px; }
+.q-options { display: grid; gap: 6px; }
+.q-opt {
+  display: flex; gap: 8px; align-items: flex-start; text-align: left; width: 100%;
+  background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; line-height: 1.5;
+}
+.q-opt:hover:not(:disabled) { border-color: var(--accent); }
+.q-opt.picked { border-color: var(--accent); background: var(--accent-soft); }
+.q-opt:disabled { cursor: default; }
+.q-opt.is-answer { border-color: var(--lv-a); box-shadow: inset 3px 0 0 var(--lv-a); }
+.q-opt.is-wrong { border-color: var(--lv-d); box-shadow: inset 3px 0 0 var(--lv-d); background: none; }
+.q-letter { color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.q-opt.picked .q-letter { color: var(--accent); font-weight: 700; }
+.q-explain { margin: 8px 0 0; font-size: 0.9rem; background: var(--accent-soft); border-radius: 10px; padding: 8px 12px; line-height: 1.6; }
+.q-explain b { margin-right: 6px; }
+.q-skill { font-size: 0.75rem; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 0 8px; margin-right: 6px; }
+.quiz-confirm { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 10px; }
+.quiz-confirm p { margin: 0 0 8px; }
+.quiz .actions { display: flex; gap: 8px; align-items: center; }
+.quiz .actions .ghost { margin-top: 0; }
+.mode-seg button { display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
+.mode-seg button small { font-size: 0.72rem; color: var(--muted); font-weight: 400; }

@@ -1,9 +1,10 @@
 import { getKeypoints, logUsage, saveKeypoints, type Article } from "./db";
 import { chatJson, type LlmConfig, type LlmUsage } from "./llm";
 import { mockGrade, mockKeypoints } from "./mock";
-import { gradingPrompt, keypointsPrompt } from "./prompts";
+import { gradingPrompt, keypointsPrompt, quizPrompt } from "./prompts";
+import { getQuiz, mockQuiz, saveQuiz, shuffleQuiz } from "./quiz";
 import { computeScores, type ScoreItem } from "./rubric";
-import { KeypointsSchema, LlmGradeSchema, type Grade, type Keypoints, type OutlineNode } from "./schemas";
+import { KeypointsSchema, LlmGradeSchema, QuizSchema, type Grade, type Keypoints, type OutlineNode, type Quiz } from "./schemas";
 import { copyLevel, copyRatio as computeCopyRatio, countOutlineItems, outlineToText, type CopyLevel } from "./textcheck";
 
 export function llmConfig(env: CloudflareEnv): LlmConfig {
@@ -33,6 +34,37 @@ export async function ensureKeypoints(env: CloudflareEnv, article: Article, forc
   }
   await saveKeypoints(env.DB, article.id, model, kp);
   return kp;
+}
+
+/**
+ * 取得（或第一次產生並快取）文章的閱讀測驗題目；force = 後台要求重新出題。
+ * 非 force 時用「沒有才寫入」，兩個學生同時開同一篇也只會留下一份題目。
+ */
+export async function ensureQuiz(env: CloudflareEnv, article: Article, force = false): Promise<Quiz> {
+  if (!force) {
+    const cached = await getQuiz(env.DB, article.id);
+    if (cached) return cached.quiz;
+  }
+  const cfg = llmConfig(env);
+  let quiz: Quiz;
+  let model = env.KEYPOINT_MODEL;
+  if (cfg.mock) {
+    quiz = mockQuiz(article);
+    model = "mock";
+  } else {
+    const r = await chatJson(cfg, env.KEYPOINT_MODEL, quizPrompt(article), QuizSchema, { maxTokens: 3000, temperature: 0.3 });
+    quiz = shuffleQuiz(r.data);
+    await logUsage(env.DB, { kind: "quiz", model, articleId: article.id, ...r.usage });
+  }
+  if (force) {
+    await saveQuiz(env.DB, article.id, model, quiz);
+    return quiz;
+  }
+  await env.DB
+    .prepare("INSERT INTO article_quizzes (article_id, model, data_json) VALUES (?, ?, ?) ON CONFLICT(article_id) DO NOTHING")
+    .bind(article.id, model, JSON.stringify(quiz))
+    .run();
+  return (await getQuiz(env.DB, article.id))?.quiz ?? quiz;
 }
 
 export type GradeResult = {

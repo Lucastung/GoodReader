@@ -66,3 +66,11 @@ pre.notes { white-space: pre-wrap; font: inherit; font-size: 0.85rem; margin: 0;
 .two > * { min-width: 0; }
 .panel .toolbar + .msg, .panel .toolbar + .two { margin-top: 10px; }
 .admin { min-width: 0; }
+
+/* 閱讀測驗題目 */
+.quiz-admin > li { margin-bottom: 12px; }
+.quiz-admin ul.plain { margin: 4px 0; }
+.quiz-edit { display: grid; gap: 6px; }
+.quiz-edit textarea { width: 100%; }
+.quiz-edit-opt { display: grid; grid-template-columns: auto auto 1fr; gap: 6px; align-items: center; font-size: 0.9rem; }
+.quiz-edit-opt input:not([type="radio"]) { width: 100%; }

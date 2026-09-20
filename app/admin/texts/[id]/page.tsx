@@ -7,6 +7,7 @@ import { api } from "@/lib/client";
 import { GENRES, LICENSES } from "@/lib/schemas";
 import { fmtTime, useAdmin } from "../../AdminShell";
 import { LICENSE_LABEL, ORIGIN_LABEL, STATUS_LABEL } from "../labels";
+import { QuizPanel, type QuizInfo } from "./QuizPanel";
 
 type Form = {
   title: string;
@@ -54,6 +55,10 @@ export default function TextEditor() {
   const [meta, setMeta] = useState<Meta | null>(null);
   const [sessions, setSessions] = useState(0);
   const [kp, setKp] = useState<{ model: string; createdAt?: string; data: Keypoints } | null>(null);
+  const [quiz, setQuiz] = useState<{ info: QuizInfo; attempts: { count: number; avgCorrect: number | null } }>({
+    info: null,
+    attempts: { count: 0, avgCorrect: null },
+  });
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [loaded, setLoaded] = useState(isNew);
@@ -64,6 +69,8 @@ export default function TextEditor() {
       const d = await api<{
         article: Meta & { title: string; author: string; era: string | null; genre: string; difficulty: number; license: string; url: string | null; notes: string | null; paragraphs: string[] };
         keypoints: { model: string; createdAt: string; data: Keypoints } | null;
+        quiz: QuizInfo;
+        quizAttempts: { count: number; avgCorrect: number | null };
         sessions: number;
       }>(`/api/admin/articles/${id}`);
       const a = d.article;
@@ -82,6 +89,7 @@ export default function TextEditor() {
       setSaved(f);
       setMeta(a);
       setKp(d.keypoints);
+      setQuiz({ info: d.quiz, attempts: d.quizAttempts });
       setSessions(d.sessions);
       setLoaded(true);
     } catch (e) {
@@ -132,7 +140,7 @@ export default function TextEditor() {
       }
       const r = await api<{ textChanged: boolean }>(`/api/admin/articles/${id}`, { method: "PUT", body: payload() });
       await load();
-      return r.textChanged ? "已儲存。正文有改，要點底稿已清除，請重新產生檢查。" : "已儲存";
+      return r.textChanged ? "已儲存。正文有改，要點底稿與閱讀測驗題目已清除，請重新產生檢查。" : "已儲存";
     });
 
   const setStatus = (status: string, text: string) =>
@@ -326,6 +334,8 @@ export default function TextEditor() {
               </button>
             </div>
           )}
+
+          {!isNew && <QuizPanel articleId={id} initial={quiz.info} attempts={quiz.attempts} dirty={dirty} />}
         </div>
       </div>
     </>

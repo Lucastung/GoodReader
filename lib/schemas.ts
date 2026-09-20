@@ -3,6 +3,10 @@ import { z } from "zod";
 export const GRADES = ["junior", "senior"] as const;
 export type Grade = (typeof GRADES)[number];
 
+/** 練習模式：基礎＝閱讀測驗（預設國中）；進階＝大綱＋摘要（預設高中） */
+export const MODES = ["basic", "advanced"] as const;
+export type Mode = (typeof MODES)[number];
+
 export const GENRES = ["文言文", "散文", "記敘文", "議論文", "說明文"] as const;
 
 export const LEVELS = ["優", "良", "尚可", "待加強"] as const;
@@ -32,6 +36,7 @@ export type Paragraph = { id: string; text: string };
 // ---- API 輸入 ----
 export const StartSessionInput = z.object({
   grade: z.enum(GRADES),
+  mode: z.enum(MODES).default("advanced"),
   genre: z.enum(GENRES).optional(),
   articleId: z.string().max(64).optional(),
 });
@@ -40,6 +45,31 @@ export const SubmitAttemptInput = z.object({
   outline: OutlineSchema,
   summary: z.string().trim().max(1200),
 });
+
+/** 閱讀測驗交卷：每題選的選項索引 */
+export const SubmitQuizInput = z.object({
+  answers: z.array(z.number().int().min(0).max(3)).length(5),
+});
+
+// ---- 閱讀測驗題目（LLM 輸出，也是後台編輯的格式） ----
+export const QUIZ_SIZE = 5;
+export const QUIZ_POINTS_EACH = 5;
+export const QUIZ_SKILLS = ["擷取訊息", "推論分析", "詮釋整合", "比較評估"] as const;
+
+export const QuizQuestionSchema = z
+  .object({
+    q: z.string().trim().min(4, "題幹太短").max(300),
+    options: z.array(z.string().trim().min(1, "選項不可空白").max(120)).length(4, "要有 4 個選項"),
+    answer: z.number().int().min(0).max(3),
+    explanation: z.string().trim().min(1, "請寫解析").max(400),
+    paragraph: z.string().max(10).nullable().optional(),
+    skill: z.enum(QUIZ_SKILLS).nullable().optional().catch(null),
+  })
+  .refine((x) => new Set(x.options).size === 4, { message: "4 個選項不可重複" });
+export type QuizQuestion = z.infer<typeof QuizQuestionSchema>;
+
+export const QuizSchema = z.object({ questions: z.array(QuizQuestionSchema).length(QUIZ_SIZE, `要剛好 ${QUIZ_SIZE} 題`) });
+export type Quiz = z.infer<typeof QuizSchema>;
 
 // ---- LLM 輸出：要點底稿 ----
 export const KeypointsSchema = z.object({

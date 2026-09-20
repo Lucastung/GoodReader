@@ -1,8 +1,9 @@
 // 後台用的 D1 查詢
-import { getStats } from "./db";
-import type { ArticleInputT } from "./schemas";
-import { countHan } from "./textcheck";
-import { tokenHistory } from "./tokens";
+import { BEST_CTE, getStats } from "./db.ts";
+import type { ArticleInputT } from "./schemas.ts";
+import { countHan } from "./textcheck.ts";
+import { getQuiz } from "./quiz.ts";
+import { tokenHistory } from "./tokens.ts";
 
 // ---------- 帳戶 ----------
 
@@ -25,12 +26,8 @@ export async function listUsers(db: D1Database, q: string, limit: number, offset
   const [rows, count] = await db.batch([
     db
       .prepare(
-        `WITH best AS (
-           SELECT s.client_id, s.article_id, MAX(g.total) AS best, MAX(t.submitted_at) AS last
-           FROM sessions s JOIN attempts t ON t.session_id = s.id JOIN grades g ON g.attempt_id = t.id
-           GROUP BY s.client_id, s.article_id
-         ),
-         agg AS (SELECT client_id, COUNT(*) AS done, SUM(best) AS pts, MAX(last) AS last FROM best GROUP BY client_id),
+        `WITH ${BEST_CTE},
+         agg AS (SELECT client_id, COUNT(*) AS done, SUM(best) AS pts, MAX(last) AS last FROM best_all GROUP BY client_id),
          red AS (SELECT client_id, SUM(points) AS redeemed FROM redemptions GROUP BY client_id)
          SELECT u.id, u.nickname, u.created_at, u.disabled, (u.parent_pin_hash IS NOT NULL) AS has_parent_pin,
                 u.token_balance, u.grade_level,
@@ -70,10 +67,12 @@ export async function userDetail(db: D1Database, id: string) {
   const [sessions, redemptions, logins] = await db.batch([
     db
       .prepare(
-        `SELECT s.id, s.started_at, s.grade, a.title, a.difficulty,
-                COUNT(t.id) AS attempts, MAX(g.total) AS best
+        `SELECT s.id, s.started_at, s.grade, CASE s.mode WHEN 'basic' THEN 'basic' ELSE 'advanced' END AS mode,
+                a.title, a.difficulty,
+                COUNT(t.id) + COUNT(q.id) AS attempts, COALESCE(MAX(g.total), MAX(q.score)) AS best
          FROM sessions s JOIN articles a ON a.id = s.article_id
          LEFT JOIN attempts t ON t.session_id = s.id LEFT JOIN grades g ON g.attempt_id = t.id
+         LEFT JOIN quiz_attempts q ON q.session_id = s.id
          WHERE s.client_id = ? GROUP BY s.id ORDER BY s.started_at DESC LIMIT 50`,
       )
       .bind(id),
@@ -167,10 +166,17 @@ export async function adminArticle(db: D1Database, id: string) {
     .bind(id)
     .first<{ model: string; data_json: string; created_at: string }>();
   const used = await db.prepare("SELECT COUNT(*) AS n FROM sessions WHERE article_id = ?").bind(id).first<{ n: number }>();
+  const quiz = await getQuiz(db, id);
+  const quizStats = await db
+    .prepare("SELECT COUNT(*) AS n, AVG(correct) AS avg FROM quiz_attempts WHERE article_id = ?")
+    .bind(id)
+    .first<{ n: number; avg: number | null }>();
   const { paragraphs_json, ...rest } = a;
   return {
     article: { ...rest, paragraphs: (JSON.parse(paragraphs_json) as { text: string }[]).map((p) => p.text) },
     keypoints: kp ? { model: kp.model, createdAt: kp.created_at, data: JSON.parse(kp.data_json) } : null,
+    quiz,
+    quizAttempts: { count: quizStats?.n ?? 0, avgCorrect: quizStats?.avg ?? null },
     sessions: used?.n ?? 0,
   };
 }
@@ -248,7 +254,10 @@ export async function updateArticle(db: D1Database, id: string, a: ArticleInputT
       ),
   ];
   const textChanged = json !== old.paragraphs_json;
-  if (textChanged) stmts.push(db.prepare("DELETE FROM article_keypoints WHERE article_id = ?").bind(id));
+  if (textChanged) {
+    stmts.push(db.prepare("DELETE FROM article_keypoints WHERE article_id = ?").bind(id));
+    stmts.push(db.prepare("DELETE FROM article_quizzes WHERE article_id = ?").bind(id));
+  }
   await db.batch(stmts);
   return { textChanged };
 }

@@ -35,7 +35,7 @@ type Detail = {
   };
   tokenHistory: { id: string; delta: number; balance_after: number; reason: string; note: string | null; created_by: string | null; created_at: string }[];
   stats: { completed: number; totalPoints: number; redeemed: number; remaining: number; byDifficulty: { difficulty: number; count: number; avg: number | null }[] };
-  sessions: { id: string; started_at: string; grade: string; title: string; difficulty: number; attempts: number; best: number | null }[];
+  sessions: { id: string; started_at: string; grade: string; mode: "basic" | "advanced"; title: string; difficulty: number; attempts: number; best: number | null }[];
   redemptions: { id: string; points: number; created_at: string }[];
   activeLogins: number;
 };
@@ -318,6 +318,7 @@ function UserDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
                 <tr>
                   <th>時間</th>
                   <th>文章</th>
+                  <th>模式</th>
                   <th className="num">難度</th>
                   <th className="num">送出</th>
                   <th className="num">最高分</th>
@@ -328,14 +329,15 @@ function UserDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
                   <tr key={s.id}>
                     <td>{fmtTime(s.started_at)}</td>
                     <td className="wrap">{s.title}</td>
+                    <td>{s.mode === "basic" ? "基礎" : "進階"}</td>
                     <td className="num">{s.difficulty}</td>
                     <td className="num">{s.attempts}</td>
-                    <td className="num">{s.best ?? "—"}</td>
+                    <td className="num">{s.best == null ? "—" : s.mode === "basic" ? `${s.best}/25` : s.best}</td>
                   </tr>
                 ))}
                 {!d.sessions.length && (
                   <tr>
-                    <td colSpan={5} className="muted">
+                    <td colSpan={6} className="muted">
                       還沒有練習
                     </td>
                   </tr>
