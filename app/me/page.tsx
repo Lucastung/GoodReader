@@ -160,7 +160,7 @@ export default function MePage() {
           </a>
         </div>
         <p className="muted small">
-          每次送出評分用 {tokens?.gradeCost ?? 2} 個 Token；評分失敗會自動退回。Token 是 LUCAS 各應用共用的，每月 1 日補發本月的額度。
+          每次送出評分用 {tokens?.gradeCost ?? 20} 點 Token；評分失敗會自動退回。Token 是 LUCAS 各應用共用的，每月 1 日補發本月的額度。
         </p>
         <h3>最近紀錄</h3>
         <ul className="ledger">

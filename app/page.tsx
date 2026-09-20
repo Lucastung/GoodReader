@@ -118,7 +118,7 @@ export default function Home() {
     <div className="home">
       {welcome && me && (
         <p className="gift" role="status">
-          🎉 歡迎，{me.nickname}！你有 {me.unlimited ? "不限" : me.tokens} 個 Token，每次評分用 2 個。選一篇文章開始吧。
+          🎉 歡迎，{me.nickname}！你有 {me.unlimited ? "不限" : me.tokens} 個 Token，每次評分用 20 點。選一篇文章開始吧。
         </p>
       )}
       {me && !me.unlimited && me.tokens < 2 && (

@@ -1,7 +1,7 @@
-// Token：由 lucasact 帳號服務管（全站共用的錢包：每月發放＋購買）。好好讀書每次評分扣 2；評分失敗退回。
+// Token：由 lucasact 帳號服務管（全站共用的錢包：每月發放＋購買）。好好讀書每次評分扣 20（10 點 ＝ NT$1）；評分失敗退回。
 // 扣點都帶冪等鍵：網路重試或同時送出兩次，也只會扣一次。
 
-export const GRADE_COST = 2;
+export const GRADE_COST = 20;
 export const APP = "goodreader";
 
 export type SpendOk = { ok: true; balance: number; ledgerId: string };

@@ -51,7 +51,7 @@ function LoginBox() {
         用 Google 登入
       </a>
       {error && <p className="error small">{error}</p>}
-      <p className="gift">🪙 每個月送 Token，每次評分用 2 個。</p>
+      <p className="gift">🪙 每個月送 Token，每次評分用 20 點。</p>
       <p className="muted small">
         這是 LUCAS 的共用帳號：好好讀書、FreeScript、FishOn 用同一個帳號和 Token 錢包，在
         <a href="https://lucasact.com/token.html"> lucasact.com </a>
