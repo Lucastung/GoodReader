@@ -46,6 +46,24 @@ const splitBody = (b: string) =>
     .filter(Boolean);
 const countHan = (s: string) => (s.match(/\p{Script=Han}/gu) || []).length;
 
+const FLASH_KEY = "rd.admin.flash";
+function flash(text: string) {
+  try {
+    sessionStorage.setItem(FLASH_KEY, text);
+  } catch {
+    /* 忽略 */
+  }
+}
+function takeFlash() {
+  try {
+    const m = sessionStorage.getItem(FLASH_KEY);
+    sessionStorage.removeItem(FLASH_KEY);
+    return m;
+  } catch {
+    return null;
+  }
+}
+
 export default function TextEditor() {
   const { id } = useParams<{ id: string }>();
   const isNew = id === "new";
@@ -110,6 +128,21 @@ export default function TextEditor() {
     load();
   }, [load]);
 
+  // 上一篇上架後跳過來時帶的訊息
+  useEffect(() => {
+    const m = takeFlash();
+    if (m) setMsg({ ok: true, text: m });
+  }, [id]);
+
+  /** 這篇未處理的檢舉數 */
+  const [openReports, setOpenReports] = useState(0);
+  useEffect(() => {
+    if (isNew) return;
+    api<{ counts: Record<string, number> }>(`/api/admin/reports?status=open&article=${encodeURIComponent(id)}`)
+      .then((d) => setOpenReports(d.counts.open ?? 0))
+      .catch(() => {});
+  }, [id, isNew]);
+
   const paragraphs = useMemo(() => splitBody(form.body), [form.body]);
   const chars = paragraphs.reduce((n, p) => n + countHan(p), 0);
   const dirty = JSON.stringify(form) !== JSON.stringify(saved);
@@ -157,7 +190,17 @@ export default function TextEditor() {
   const setStatus = (status: string, text: string) =>
     run(status, async () => {
       if (dirty) throw new Error("有未儲存的修改，請先儲存");
-      await api(`/api/admin/articles/${id}/status`, { method: "POST", body: JSON.stringify({ status }) });
+      const r = await api<{ nextDraft?: string | null }>(`/api/admin/articles/${id}/status`, { method: "POST", body: JSON.stringify({ status }) });
+      if (status === "approved") {
+        if (r.nextDraft) {
+          // 上架後直接跳下一篇待審，訊息帶到下一頁顯示
+          flash(`已上架「${saved.title}」。這是下一篇待審。`);
+          router.push(`/admin/texts/${r.nextDraft}`);
+          return;
+        }
+        await load();
+        return `${text}。待審的文章都審完了！`;
+      }
       await load();
       return text;
     });
@@ -191,6 +234,11 @@ export default function TextEditor() {
               {meta.created_by ? `（${meta.created_by}）` : ""}
               {meta.reviewed_at ? `・上架審核 ${meta.reviewed_by}，${fmtTime(meta.reviewed_at)}` : ""}・練習 {sessions} 次
             </span>
+            {openReports > 0 && (
+              <Link href={`/admin/reports?article=${encodeURIComponent(id)}`} className="small error">
+                ⚑ {openReports} 則未處理檢舉
+              </Link>
+            )}
           </>
         )}
         <span className="spacer" />

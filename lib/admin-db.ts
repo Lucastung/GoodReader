@@ -287,6 +287,15 @@ export async function setArticleStatus(db: D1Database, id: string, status: strin
   return r.meta.changes > 0;
 }
 
+/** 下一篇待審：順序和後台列表一樣（難度、標題），跳過剛審完的那篇 */
+export async function nextDraftId(db: D1Database, excludeId: string) {
+  const r = await db
+    .prepare("SELECT id FROM articles WHERE status = 'draft' AND id <> ? ORDER BY difficulty, title LIMIT 1")
+    .bind(excludeId)
+    .first<{ id: string }>();
+  return r?.id ?? null;
+}
+
 // ---------- 用量與成本 ----------
 
 export type Prices = Record<string, { in: number; out: number }>;

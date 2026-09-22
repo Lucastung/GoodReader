@@ -38,6 +38,7 @@ export async function DELETE(req: Request, { params }: Ctx) {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM article_keypoints WHERE article_id = ?").bind(id),
     env.DB.prepare("DELETE FROM article_quizzes WHERE article_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM article_reports WHERE article_id = ?").bind(id),
     env.DB.prepare("DELETE FROM articles WHERE id = ?").bind(id),
   ]);
   await audit(env.DB, a, "article.delete", id);

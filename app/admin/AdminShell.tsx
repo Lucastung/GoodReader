@@ -13,6 +13,7 @@ const NAV = [
   { href: "/admin/stats", label: "使用與成本", roles: ["admin"] },
   { href: "/admin/users", label: "帳戶", roles: ["admin"] },
   { href: "/admin/texts", label: "範文", roles: ["admin", "reviewer"] },
+  { href: "/admin/reports", label: "檢舉", roles: ["admin", "reviewer"] },
   { href: "/admin/roles", label: "權限", roles: ["admin"] },
 ];
 
@@ -20,12 +21,21 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<AdminMe | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const path = usePathname();
+  /** 未處理的檢舉數，顯示在導覽列上；換頁時重新讀 */
+  const [openReports, setOpenReports] = useState(0);
 
   useEffect(() => {
     api<AdminMe>("/api/admin/me")
       .then(setMe)
       .catch((e) => setErr(e.message));
   }, []);
+
+  useEffect(() => {
+    if (!me) return;
+    api<{ counts: Record<string, number> }>("/api/admin/reports?status=open")
+      .then((d) => setOpenReports(d.counts.open ?? 0))
+      .catch(() => {});
+  }, [me, path]);
 
   if (err)
     return (
@@ -45,6 +55,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           {NAV.filter((n) => n.roles.includes(me.role)).map((n) => (
             <Link key={n.href} href={n.href} className={path.startsWith(n.href) ? "on" : ""}>
               {n.label}
+              {n.href === "/admin/reports" && openReports > 0 && <span className="nav-count">{openReports}</span>}
             </Link>
           ))}
           <span className="admin-who small muted">

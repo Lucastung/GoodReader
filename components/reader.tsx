@@ -2,6 +2,7 @@
 
 import { setPref } from "@/lib/client";
 import type { Article } from "@/lib/db";
+import { ReportButton } from "./ReportButton";
 import { ReadAloudBar, type useReadAloud } from "./speech";
 
 /** 練習頁左側的文章區（進階與基礎共用） */
@@ -68,6 +69,7 @@ export function ArticleReader({
           </>
         )}
       </p>
+      <ReportButton articleId={article.id} paragraphIds={article.paragraphs.map((p) => p.id)} />
     </article>
   );
 }

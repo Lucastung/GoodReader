@@ -397,3 +397,12 @@ button.pid:hover { border-color: var(--accent); color: var(--accent); }
 .login .google-btn svg { background: #fff; border-radius: 50%; padding: 2px; }
 .login .google-btn.disabled { opacity: 0.5; pointer-events: none; }
 .login .gift { margin-bottom: 10px; }
+
+/* 文章下方的「回報問題」 */
+.report-toggle { font-size: 0.8rem; color: var(--muted); padding: 0; margin-top: 6px; }
+.report-done { font-size: 0.85rem; color: var(--muted); margin: 8px 0 0; }
+.report-box { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; }
+.report-box .report-head { display: flex; justify-content: space-between; align-items: center; }
+.report-box .report-field { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 0.85rem; }
+.report-box .report-field select { width: auto; }
+.report-box .primary { align-self: flex-start; }
