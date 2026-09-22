@@ -62,7 +62,7 @@ test("沒指定系列時，行為和以前一樣，各系列都可能抽到", as
 
 test("系列清單只列已上架、且真的有系列的文章", async () => {
   const db = await setup();
-  assert.deepEqual(await listSeries(db), ["釣魚", "廚藝"]); // 依篇數多寡排序
+  assert.deepEqual(await listSeries(db), ["經典", "釣魚", "廚藝"]); // 依篇數多寡排序（內建經典 9 篇）
   const list = await listArticles(db);
   assert.equal(list.find((a) => a.id === "cook-a")?.series, "廚藝");
 });
@@ -70,7 +70,7 @@ test("系列清單只列已上架、且真的有系列的文章", async () => {
 test("後台可以依系列篩選，也會回傳現有的系列清單", async () => {
   const db = await setup();
   const all = await listAdminArticles(db, {});
-  assert.deepEqual(all.series, ["廚藝", "釣魚"]); // 後台依名稱排序，含草稿
+  assert.deepEqual(all.series, ["廚藝", "經典", "釣魚"]); // 後台依名稱排序，含草稿與內建經典
   const only = await listAdminArticles(db, { series: "釣魚" });
   assert.equal(only.articles.length, 3);
   assert.ok(only.articles.every((a) => a.series === "釣魚"));
@@ -82,4 +82,14 @@ test("編輯文章可以改系列，也可以清空", async () => {
   assert.equal((await getArticle(db, "cook-a"))?.series, "釣魚");
   await updateArticle(db, "cook-a", article({ title: "料理一", series: null }));
   assert.equal((await getArticle(db, "cook-a"))?.series, null);
+});
+
+test("內建經典的種子 migration 會帶系列「經典」", async () => {
+  const db = makeD1();
+  const rows = await db
+    .prepare("SELECT id, series FROM articles WHERE origin IS NULL OR origin <> 'import'")
+    .all<{ id: string; series: string | null }>();
+  const classics = rows.results.filter((r) => ["taohuayuan-ji", "congcong", "luo-huasheng"].includes(r.id));
+  assert.equal(classics.length, 3);
+  for (const c of classics) assert.equal(c.series, "經典", `${c.id} 少了系列`);
 });

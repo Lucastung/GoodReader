@@ -190,7 +190,7 @@ lib/
   auth.ts  tokens.ts               接 lucasact 帳號服務：登入 cookie → 使用者、扣點與退回
   admin.ts  admin-db.ts           後台身分（Access JWT）、後台查詢
 migrations/                       D1 schema 與經典文章種子資料
-data/classics.json                內建文章原始資料
+data/classics.json                內建文章原始資料（與後台匯入同格式，含要點底稿與閱讀測驗；改完跑 node scripts/build-seed.mjs）
 ```
 
 ## 帳號與積分

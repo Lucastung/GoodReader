@@ -82,7 +82,7 @@ test("在好好讀書停用的人不是登入狀態", async () => {
 });
 
 test("扣點帶 app 與冪等鍵；同一個鍵只扣一次；失敗退回", async () => {
-  const { rpc, calls } = fakeAccounts({ balance: 3 });
+  const { rpc, calls } = fakeAccounts({ balance: GRADE_COST + 1 });
   const env = { DB: makeD1(), ACCOUNTS: rpc } as unknown as CloudflareEnv;
   const a = await spendForGrade(env, "u1", { ref: "s1", idemKey: "quiz:s1", note: "桃花源記" });
   const b = await spendForGrade(env, "u1", { ref: "s1", idemKey: "quiz:s1", note: "桃花源記" });
@@ -94,7 +94,7 @@ test("扣點帶 app 與冪等鍵；同一個鍵只扣一次；失敗退回", asy
   const c = await spendForGrade(env, "u1", { ref: "s2", idemKey: "quiz:s2", note: "x" });
   assert.equal(c.ok, false);
   assert.match(!c.ok ? c.message : "", /Token 不足/);
-  if (a.ok) assert.equal(await refundGrade(env, "u1", a.ledgerId, "評分失敗"), 3);
+  if (a.ok) assert.equal(await refundGrade(env, "u1", a.ledgerId, "評分失敗"), GRADE_COST + 1);
 });
 
 test("管理員不扣，也不用退", async () => {
