@@ -1,6 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "goodreader",
+  // tong.lucas@gmail.com 底下有不只一個 Cloudflare 帳號，不釘死的話 wrangler 會挑錯
+  // 帳號，deploy 與 d1 migrations 會失敗（10000 / 7403）
+  "account_id": "06cc330d909e576dc8b21ed254649b02",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-06-01",
   // global_fetch_strictly_public：fetch 只能連公網，擋掉內網位址（防 SSRF）
