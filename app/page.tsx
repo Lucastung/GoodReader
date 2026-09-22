@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, api, getPref, setAccessCode, setPref } from "@/lib/client";
+import { ALL, genreOptions, keepValid, seriesOptions } from "@/lib/options";
 import type { Stats } from "@/lib/db";
 
 type Me = { id: string; nickname: string; gradeLevel: string | null; tokens: number; unlimited: boolean } | null;
@@ -22,8 +23,6 @@ type ArticleItem = {
 };
 type Mode = "basic" | "advanced";
 
-const GENRE_OPTIONS = ["全部", "文言文", "散文", "記敘文"];
-const ALL = "全部";
 
 export default function Home() {
   const router = useRouter();
@@ -118,8 +117,8 @@ export default function Home() {
     );
   }
 
-  // 系列選單只列出目前真的有文章的系列
-  const seriesOptions = [ALL, ...[...new Set(articles.map((a) => a.series).filter((x): x is string => !!x))].sort()];
+  const genres = genreOptions(articles);
+  const seriesList = seriesOptions(articles);
   const shown = articles.filter((a) => (genre === ALL || a.genre === genre) && (series === ALL || a.series === series));
 
   return (
@@ -165,23 +164,25 @@ export default function Home() {
             </button>
           ))}
         </div>
-        <select value={genre} onChange={(e) => setGenre(e.target.value)} aria-label="文體">
-          {GENRE_OPTIONS.map((g) => (
-            <option key={g} value={g}>
-              {g === ALL ? "全部文體" : g}
-            </option>
-          ))}
-        </select>
-        {seriesOptions.length > 1 && (
+        {genres.length > 1 && (
+          <select value={keepValid(genre, genres)} onChange={(e) => setGenre(e.target.value)} aria-label="文體">
+            {genres.map((g) => (
+              <option key={g} value={g}>
+                {g === ALL ? "全部文體" : g}
+              </option>
+            ))}
+          </select>
+        )}
+        {seriesList.length > 1 && (
           <select
-            value={seriesOptions.includes(series) ? series : ALL}
+            value={keepValid(series, seriesList)}
             onChange={(e) => {
               setSeries(e.target.value);
               setPref("series", e.target.value);
             }}
             aria-label="系列"
           >
-            {seriesOptions.map((s) => (
+            {seriesList.map((s) => (
               <option key={s} value={s}>
                 {s === ALL ? "全部系列" : s}
               </option>
