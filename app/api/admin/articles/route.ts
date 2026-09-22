@@ -16,6 +16,7 @@ export async function GET(req: Request) {
       status: u.get("status") || undefined,
       q: u.get("q") || undefined,
       genre: u.get("genre") || undefined,
+      series: u.get("series") || undefined,
     }),
   );
 }

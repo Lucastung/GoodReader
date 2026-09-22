@@ -14,6 +14,7 @@ type Form = {
   author: string;
   era: string;
   genre: string;
+  series: string;
   difficulty: number;
   license: string;
   url: string;
@@ -37,7 +38,7 @@ type Keypoints = {
   referenceOutline: { text: string; children?: { text: string; children?: unknown[] }[] }[];
 };
 
-const EMPTY: Form = { title: "", author: "", era: "", genre: "記敘文", difficulty: 2, license: "original", url: "", notes: "", body: "" };
+const EMPTY: Form = { title: "", author: "", era: "", genre: "記敘文", series: "", difficulty: 2, license: "original", url: "", notes: "", body: "" };
 const splitBody = (b: string) =>
   b
     .split(/\n\s*\n/)
@@ -62,12 +63,20 @@ export default function TextEditor() {
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [loaded, setLoaded] = useState(isNew);
+  /** 已經用過的系列，給輸入框當建議清單，避免同一個系列打出兩種寫法 */
+  const [seriesOptions, setSeriesOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    api<{ series: string[] }>("/api/admin/articles?status=")
+      .then((d) => setSeriesOptions(d.series ?? []))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     if (isNew) return;
     try {
       const d = await api<{
-        article: Meta & { title: string; author: string; era: string | null; genre: string; difficulty: number; license: string; url: string | null; notes: string | null; paragraphs: string[] };
+        article: Meta & { title: string; author: string; era: string | null; genre: string; series: string | null; difficulty: number; license: string; url: string | null; notes: string | null; paragraphs: string[] };
         keypoints: { model: string; createdAt: string; data: Keypoints } | null;
         quiz: QuizInfo;
         quizAttempts: { count: number; avgCorrect: number | null };
@@ -79,6 +88,7 @@ export default function TextEditor() {
         author: a.author,
         era: a.era ?? "",
         genre: a.genre,
+        series: a.series ?? "",
         difficulty: a.difficulty,
         license: a.license,
         url: a.url ?? "",
@@ -124,6 +134,7 @@ export default function TextEditor() {
       author: form.author,
       era: form.era || null,
       genre: form.genre,
+      series: form.series.trim() || null,
       difficulty: form.difficulty,
       license: form.license,
       url: form.url || null,
@@ -229,6 +240,21 @@ export default function TextEditor() {
                   <option key={g}>{g}</option>
                 ))}
               </select>
+            </label>
+            <label className="field">
+              <span>系列</span>
+              <input
+                value={form.series}
+                maxLength={30}
+                list="series-list"
+                placeholder="例如：釣魚（可留空）"
+                onChange={(e) => set("series", e.target.value)}
+              />
+              <datalist id="series-list">
+                {seriesOptions.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
             </label>
             <label className="field">
               <span>難度（國中 1–3、高中 3–5）</span>

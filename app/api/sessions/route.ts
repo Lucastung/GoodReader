@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
   const parsed = StartSessionInput.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError(400, "參數錯誤");
-  const { grade, genre, articleId, mode } = parsed.data;
+  const { grade, genre, series, articleId, mode } = parsed.data;
 
   // 閱讀測驗每篇只能作答一次：指定已做過的文章 → 帶回原本那次，看成績與解析
   if (mode === "basic" && articleId) {
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   const quizDone = mode === "basic" ? await quizDoneArticleIds(env.DB, clientId) : [];
   let article = articleId
     ? await getArticle(env.DB, articleId, true)
-    : await pickArticle(env.DB, grade, genre, [...new Set([...exclude, ...quizDone])]);
+    : await pickArticle(env.DB, grade, genre, [...new Set([...exclude, ...quizDone])], series);
   // 隨機抽到做過的（候選都做完、放寬條件時可能發生）就當作沒有
   if (article && mode === "basic" && !articleId && quizDone.includes(article.id)) article = null;
   if (!article)

@@ -97,6 +97,7 @@ export type AdminArticleRow = {
   author: string;
   era: string | null;
   genre: string;
+  series: string | null;
   difficulty: number;
   char_count: number;
   status: string;
@@ -110,7 +111,7 @@ export type AdminArticleRow = {
   avg_best: number | null;
 };
 
-export async function listAdminArticles(db: D1Database, f: { status?: string; q?: string; genre?: string }) {
+export async function listAdminArticles(db: D1Database, f: { status?: string; q?: string; genre?: string; series?: string }) {
   const where: string[] = [];
   const args: unknown[] = [];
   if (f.status) {
@@ -120,6 +121,10 @@ export async function listAdminArticles(db: D1Database, f: { status?: string; q?
   if (f.genre) {
     where.push("a.genre = ?");
     args.push(f.genre);
+  }
+  if (f.series) {
+    where.push("a.series = ?");
+    args.push(f.series);
   }
   if (f.q?.trim()) {
     where.push("(a.title LIKE ? OR a.author LIKE ?)");
@@ -133,7 +138,7 @@ export async function listAdminArticles(db: D1Database, f: { status?: string; q?
          FROM sessions s JOIN attempts t ON t.session_id = s.id JOIN grades g ON g.attempt_id = t.id GROUP BY s.article_id, s.client_id
        ),
        agg AS (SELECT article_id, COUNT(*) AS n, AVG(best) AS avg_best FROM best GROUP BY article_id)
-       SELECT a.id, a.title, a.author, a.era, a.genre, a.difficulty, a.char_count, a.status, a.origin, a.license,
+       SELECT a.id, a.title, a.author, a.era, a.genre, a.series, a.difficulty, a.char_count, a.status, a.origin, a.license,
               a.created_at, a.updated_at, a.reviewed_by, a.reviewed_at,
               COALESCE(agg.n, 0) AS sessions, agg.avg_best
        FROM articles a LEFT JOIN agg ON agg.article_id = a.id
@@ -146,13 +151,20 @@ export async function listAdminArticles(db: D1Database, f: { status?: string; q?
   const counts = await db
     .prepare("SELECT status, COUNT(*) AS n FROM articles GROUP BY status")
     .all<{ status: string; n: number }>();
-  return { articles: results, counts: Object.fromEntries(counts.results.map((r) => [r.status, r.n])) };
+  const seriesRows = await db
+    .prepare("SELECT series FROM articles WHERE series IS NOT NULL AND series <> '' GROUP BY series ORDER BY series")
+    .all<{ series: string }>();
+  return {
+    articles: results,
+    counts: Object.fromEntries(counts.results.map((r) => [r.status, r.n])),
+    series: seriesRows.results.map((r) => r.series),
+  };
 }
 
 export async function adminArticle(db: D1Database, id: string) {
   const a = await db
     .prepare(
-      `SELECT id, title, author, era, genre, difficulty, paragraphs_json, char_count, url, license, status, origin, notes,
+      `SELECT id, title, author, era, genre, series, difficulty, paragraphs_json, char_count, url, license, status, origin, notes,
               created_by, created_at, updated_at, reviewed_by, reviewed_at
        FROM articles WHERE id = ?`,
     )
@@ -201,9 +213,9 @@ export async function insertArticle(
   const paragraphs = toParagraphs(a.paragraphs);
   await db
     .prepare(
-      `INSERT INTO articles (id, source_id, url, title, author, era, genre, difficulty, paragraphs_json, char_count,
+      `INSERT INTO articles (id, source_id, url, title, author, era, genre, series, difficulty, paragraphs_json, char_count,
                              license, status, origin, notes, created_by, updated_at)
-       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     )
     .bind(
       id,
@@ -212,6 +224,7 @@ export async function insertArticle(
       a.author,
       a.era || null,
       a.genre,
+      a.series || null,
       a.difficulty,
       JSON.stringify(paragraphs),
       paragraphs.reduce((n, p) => n + countHan(p.text), 0),
@@ -234,7 +247,7 @@ export async function updateArticle(db: D1Database, id: string, a: ArticleInputT
   const stmts = [
     db
       .prepare(
-        `UPDATE articles SET title = ?, author = ?, era = ?, genre = ?, difficulty = ?, paragraphs_json = ?, char_count = ?,
+        `UPDATE articles SET title = ?, author = ?, era = ?, genre = ?, series = ?, difficulty = ?, paragraphs_json = ?, char_count = ?,
                 url = ?, license = ?, notes = ?, updated_at = datetime('now') WHERE id = ?`,
       )
       .bind(
@@ -242,6 +255,7 @@ export async function updateArticle(db: D1Database, id: string, a: ArticleInputT
         a.author,
         a.era || null,
         a.genre,
+        a.series || null,
         a.difficulty,
         json,
         paragraphs.reduce((n, p) => n + countHan(p.text), 0),

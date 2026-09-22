@@ -6,6 +6,7 @@ export type Article = {
   author: string;
   era: string | null;
   genre: string;
+  series: string | null;
   difficulty: number;
   paragraphs: Paragraph[];
   charCount: number;
@@ -19,6 +20,7 @@ type ArticleRow = {
   author: string;
   era: string | null;
   genre: string;
+  series: string | null;
   difficulty: number;
   paragraphs_json: string;
   char_count: number;
@@ -32,6 +34,7 @@ const toArticle = (r: ArticleRow): Article => ({
   author: r.author,
   era: r.era,
   genre: r.genre,
+  series: r.series,
   difficulty: r.difficulty,
   paragraphs: JSON.parse(r.paragraphs_json),
   charCount: r.char_count,
@@ -40,7 +43,7 @@ const toArticle = (r: ArticleRow): Article => ({
 });
 
 const ARTICLE_COLS =
-  "id, title, author, era, genre, difficulty, paragraphs_json, char_count, url, license";
+  "id, title, author, era, genre, series, difficulty, paragraphs_json, char_count, url, license";
 
 /** 年級對應的難度範圍 */
 export const DIFFICULTY_RANGE: Record<Grade, [number, number]> = { junior: [1, 3], senior: [3, 5] };
@@ -59,11 +62,15 @@ export async function pickArticle(
   grade: Grade,
   genre?: string,
   excludeIds: string[] = [],
+  series?: string,
 ): Promise<Article | null> {
   const [lo, hi] = DIFFICULTY_RANGE[grade];
   const tries: [string, unknown[]][] = [];
-  const genreSql = (genre ? " AND genre = ?" : "") + " AND status = 'approved'";
-  const genreArgs = genre ? [genre] : [];
+  // 系列與文體都是讀者主動挑的，放寬時只放寬難度與「最近做過」，不會換到別的系列或文體
+  const seriesSql = series ? " AND series = ?" : "";
+  const seriesArgs = series ? [series] : [];
+  const genreSql = (genre ? " AND genre = ?" : "") + seriesSql + " AND status = 'approved'";
+  const genreArgs = [...(genre ? [genre] : []), ...seriesArgs];
   const excl = excludeIds.length ? ` AND id NOT IN (${excludeIds.map(() => "?").join(",")})` : "";
   // 先照年級難度 + 排除最近做過的；找不到再逐步放寬
   tries.push([`difficulty BETWEEN ? AND ?${genreSql}${excl}`, [lo, hi, ...genreArgs, ...excludeIds]]);
@@ -81,9 +88,30 @@ export async function pickArticle(
 
 export async function listArticles(db: D1Database) {
   const { results } = await db
-    .prepare("SELECT id, title, author, era, genre, difficulty, char_count FROM articles WHERE status = 'approved' ORDER BY difficulty, title")
-    .all<{ id: string; title: string; author: string; era: string | null; genre: string; difficulty: number; char_count: number }>();
+    .prepare(
+      "SELECT id, title, author, era, genre, series, difficulty, char_count FROM articles WHERE status = 'approved' ORDER BY difficulty, title",
+    )
+    .all<{
+      id: string;
+      title: string;
+      author: string;
+      era: string | null;
+      genre: string;
+      series: string | null;
+      difficulty: number;
+      char_count: number;
+    }>();
   return results;
+}
+
+/** 已上架文章用到的系列清單（依篇數多寡排序），給首頁的系列選單用 */
+export async function listSeries(db: D1Database): Promise<string[]> {
+  const { results } = await db
+    .prepare(
+      "SELECT series, COUNT(*) AS n FROM articles WHERE status = 'approved' AND series IS NOT NULL AND series <> '' GROUP BY series ORDER BY n DESC, series",
+    )
+    .all<{ series: string; n: number }>();
+  return results.map((r) => r.series);
 }
 
 export async function recentArticleIds(db: D1Database, clientId: string, limit = 5): Promise<string[]> {

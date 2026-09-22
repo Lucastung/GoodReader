@@ -13,6 +13,7 @@ type Row = {
   title: string;
   author: string;
   genre: string;
+  series: string | null;
   difficulty: number;
   char_count: number;
   status: "draft" | "approved" | "archived";
@@ -26,24 +27,27 @@ type Row = {
 };
 
 
+type Data = { articles: Row[]; counts: Record<string, number>; series: string[] };
+
 export default function TextsPage() {
   const [status, setStatus] = useState<string>("draft");
   const [genre, setGenre] = useState("");
+  const [series, setSeries] = useState("");
   const [q, setQ] = useState("");
-  const [data, setData] = useState<{ articles: Row[]; counts: Record<string, number> } | null>(null);
+  const [data, setData] = useState<Data | null>(null);
   const [panel, setPanel] = useState<"none" | "generate" | "import">("none");
   const [err, setErr] = useState<string | null>(null);
   const router = useRouter();
 
   const load = useCallback(() => {
-    const p = new URLSearchParams({ status, genre, q });
-    api<{ articles: Row[]; counts: Record<string, number> }>(`/api/admin/articles?${p}`)
+    const p = new URLSearchParams({ status, genre, series, q });
+    api<Data>(`/api/admin/articles?${p}`)
       .then((d) => {
         setData(d);
         setErr(null);
       })
       .catch((e) => setErr(e.message));
-  }, [status, genre, q]);
+  }, [status, genre, series, q]);
   useEffect(() => {
     const t = setTimeout(load, 200);
     return () => clearTimeout(t);
@@ -69,6 +73,14 @@ export default function TextsPage() {
             <option key={g}>{g}</option>
           ))}
         </select>
+        {!!data?.series.length && (
+          <select value={series} onChange={(e) => setSeries(e.target.value)} aria-label="系列">
+            <option value="">全部系列</option>
+            {data.series.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+        )}
         <input type="search" placeholder="搜尋標題或作者" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="spacer" />
         <button className="btn" onClick={() => setPanel(panel === "generate" ? "none" : "generate")}>
@@ -111,6 +123,7 @@ export default function TextsPage() {
               <th>標題</th>
               <th>作者</th>
               <th>文體</th>
+              <th>系列</th>
               <th className="num">難度</th>
               <th className="num">字數</th>
               <th>狀態</th>
@@ -128,6 +141,7 @@ export default function TextsPage() {
                 </td>
                 <td>{a.author}</td>
                 <td>{a.genre}</td>
+                <td>{a.series ?? "—"}</td>
                 <td className="num">{a.difficulty}</td>
                 <td className="num">{a.char_count}</td>
                 <td>
@@ -141,7 +155,7 @@ export default function TextsPage() {
             ))}
             {data && !data.articles.length && (
               <tr>
-                <td colSpan={10} className="muted">
+                <td colSpan={11} className="muted">
                   {status === "draft" ? "沒有待審的文章。可以用「AI 撰寫」或「匯入 JSON」加一些。" : "沒有符合的文章"}
                 </td>
               </tr>
@@ -248,9 +262,12 @@ const IMPORT_EXAMPLE = `[
     "author": "劉禹錫",
     "era": "唐",
     "genre": "文言文",
+    "series": "古文選讀",
     "difficulty": 1,
     "license": "public-domain",
-    "paragraphs": ["山不在高，有仙則名。……"]
+    "paragraphs": ["山不在高，有仙則名。……"],
+    "keypoints": { "...": "選填，附上就不用再請 AI 產生" },
+    "quiz": { "questions": ["...選填，5 題四選一"] }
   }
 ]`;
 
@@ -356,7 +373,7 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
       <h3>批次匯入</h3>
       <p className="small muted">
         上傳 .json 檔（可多選，或直接拖進這個框），或貼上 JSON 陣列（格式同 data/classics.json）。全部存成待審草稿，超過 100 篇會自動分批；id 重複的會略過。每個元素一段文字；genre 可用：{GENRES.join("、")}；license
-        可用：public-domain、cc-by、cc-by-sa、authorized、original。
+        可用：public-domain、cc-by、cc-by-sa、ai-generated、authorized、original。series（系列，例如「釣魚」）選填；另可附 keypoints（要點底稿）與 quiz（5 題四選一），附了就不必再請 AI 產生。
       </p>
       <div className="toolbar" style={{ marginBottom: 8 }}>
         <label className="btn sm" style={{ cursor: "pointer" }}>

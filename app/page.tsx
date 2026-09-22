@@ -12,6 +12,7 @@ type ArticleItem = {
   author: string;
   era: string | null;
   genre: string;
+  series: string | null;
   difficulty: number;
   char_count: number;
   /** 進階最高分 */
@@ -22,11 +23,13 @@ type ArticleItem = {
 type Mode = "basic" | "advanced";
 
 const GENRE_OPTIONS = ["全部", "文言文", "散文", "記敘文"];
+const ALL = "全部";
 
 export default function Home() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("basic");
-  const [genre, setGenre] = useState("全部");
+  const [genre, setGenre] = useState(ALL);
+  const [series, setSeries] = useState(ALL);
   const [articles, setArticles] = useState<ArticleItem[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [me, setMe] = useState<Me | undefined>(undefined);
@@ -40,6 +43,8 @@ export default function Home() {
     const m = getPref("mode");
     if (m === "basic" || m === "advanced") setMode(m);
     else if (getPref("grade") === "senior") setMode("advanced"); // 舊版記的是國中／高中
+    const sr = getPref("series");
+    if (sr) setSeries(sr);
     load();
   }, []);
 
@@ -75,7 +80,8 @@ export default function Home() {
         body: JSON.stringify({
           grade: gradeFor(me.gradeLevel, mode),
           mode,
-          genre: genre === "全部" ? undefined : genre,
+          genre: genre === ALL ? undefined : genre,
+          series: series === ALL ? undefined : series,
           articleId,
         }),
       });
@@ -112,7 +118,9 @@ export default function Home() {
     );
   }
 
-  const shown = articles.filter((a) => genre === "全部" || a.genre === genre);
+  // 系列選單只列出目前真的有文章的系列
+  const seriesOptions = [ALL, ...[...new Set(articles.map((a) => a.series).filter((x): x is string => !!x))].sort()];
+  const shown = articles.filter((a) => (genre === ALL || a.genre === genre) && (series === ALL || a.series === series));
 
   return (
     <div className="home">
@@ -160,10 +168,26 @@ export default function Home() {
         <select value={genre} onChange={(e) => setGenre(e.target.value)} aria-label="文體">
           {GENRE_OPTIONS.map((g) => (
             <option key={g} value={g}>
-              {g === "全部" ? "全部" : g}
+              {g === ALL ? "全部文體" : g}
             </option>
           ))}
         </select>
+        {seriesOptions.length > 1 && (
+          <select
+            value={seriesOptions.includes(series) ? series : ALL}
+            onChange={(e) => {
+              setSeries(e.target.value);
+              setPref("series", e.target.value);
+            }}
+            aria-label="系列"
+          >
+            {seriesOptions.map((s) => (
+              <option key={s} value={s}>
+                {s === ALL ? "全部系列" : s}
+              </option>
+            ))}
+          </select>
+        )}
         <button className="primary" disabled={busy} onClick={() => start()}>
           {busy ? (mode === "basic" ? "出題中…" : "抽文章中…") : "隨機抽一篇"}
         </button>
@@ -191,7 +215,7 @@ export default function Home() {
                     ))}
                 </span>
                 <span className="meta">
-                  {a.era}・{a.author}・{a.genre}・約 {a.char_count} 字
+                  {[a.series, a.era, a.author, a.genre].filter(Boolean).join("・")}・約 {a.char_count} 字
                 </span>
                 <span className="stars" aria-label={`難度 ${a.difficulty}`}>
                   {"●".repeat(a.difficulty)}

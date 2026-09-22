@@ -38,6 +38,7 @@ export const StartSessionInput = z.object({
   grade: z.enum(GRADES),
   mode: z.enum(MODES).default("advanced"),
   genre: z.enum(GENRES).optional(),
+  series: z.string().trim().max(30).optional(),
   articleId: z.string().max(64).optional(),
 });
 
@@ -131,6 +132,8 @@ export const ArticleInput = z.object({
   author: z.string().trim().min(1, "請填作者").max(40),
   era: z.string().trim().max(20).nullable().optional(),
   genre: z.enum(GENRES),
+  /** 主題系列，例如「釣魚」；讀者可以挑系列來讀 */
+  series: z.string().trim().max(30).nullable().optional(),
   difficulty: z.number().int().min(1).max(5),
   paragraphs: z.array(z.string().trim().min(1)).min(1, "至少一段").max(40),
   url: z.string().trim().url().max(500).nullable().optional().or(z.literal("")),
