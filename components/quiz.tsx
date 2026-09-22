@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { api, getPref } from "@/lib/client";
+import { api } from "@/lib/client";
 import type { Article } from "@/lib/db";
 import type { PublicQuestion, QuizResult } from "@/lib/quiz";
 import { ArticleReader } from "./reader";
@@ -37,6 +37,8 @@ export function QuizPractice({ initial }: { initial: QuizSessionData }) {
   const [confirming, setConfirming] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 基礎模式分兩段：先讀文章，按「開始作答」才出題並蓋住原文，交卷後再掀開
+  const [started, setStarted] = useState(false);
   const [hideArticle, setHideArticle] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [nexting, setNexting] = useState(false);
@@ -44,15 +46,36 @@ export function QuizPractice({ initial }: { initial: QuizSessionData }) {
   const draftKey = `rd.quiz.${sessionId}`;
 
   useEffect(() => {
-    setHideArticle(getPref("closedBook") === "1");
+    if (initial.quizResult) {
+      // 檢討模式：原文與解析都要看得到
+      setStarted(true);
+      setHideArticle(false);
+      return;
+    }
     try {
       const raw = localStorage.getItem(draftKey);
       const saved = raw ? (JSON.parse(raw) as (number | null)[]) : null;
       if (saved && questions && saved.length === questions.length) setAnswers(saved);
+      // 作答到一半重新整理，不要退回閱讀階段
+      if (localStorage.getItem(`${draftKey}.started`) === "1") {
+        setStarted(true);
+        setHideArticle(true);
+      }
     } catch {
       /* 沒有草稿 */
     }
-  }, [draftKey, questions]);
+  }, [draftKey, questions, initial.quizResult]);
+
+  function start() {
+    setStarted(true);
+    setHideArticle(true);
+    try {
+      localStorage.setItem(`${draftKey}.started`, "1");
+    } catch {
+      /* 忽略 */
+    }
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
+  }
 
   function choose(i: number, k: number) {
     if (result) return;
@@ -83,8 +106,10 @@ export function QuizPractice({ initial }: { initial: QuizSessionData }) {
       });
       setResult(r);
       setTokens(r.tokens);
+      setHideArticle(false); // 交卷了就把原文放出來，對照解析用
       try {
         localStorage.removeItem(draftKey);
+        localStorage.removeItem(`${draftKey}.started`);
       } catch {
         /* 忽略 */
       }
@@ -142,13 +167,21 @@ export function QuizPractice({ initial }: { initial: QuizSessionData }) {
                 <div>{result.correct === result.items.length ? "全對，太厲害了！" : "看看下面的解析，點「看 P?」回原文找依據。"}</div>
               </div>
             </div>
+          ) : started ? (
+            <>
+              <h2>閱讀測驗</h2>
+              <p className="hint">
+                5 題選擇題，一題 5 分。原文已經蓋起來，真的想不起來可以取消右上角的「蓋起原文」掀開它。交卷後不能修改。
+              </p>
+            </>
           ) : (
             <>
               <h2>閱讀測驗</h2>
-              <p className="hint">讀完文章後回答 5 題選擇題，一題 5 分。每篇只能作答一次，交卷後就不能修改。</p>
+              <p className="hint">先把文章讀一遍。按「開始作答」之後會蓋住原文，接著回答 5 題選擇題，一題 5 分；每篇只能作答一次。</p>
             </>
           )}
 
+          {(started || result) && (
           <ol className="quiz-list">
             {items.map((q, i) => {
               const done = result ? result.items[i] : null;
@@ -199,8 +232,15 @@ export function QuizPractice({ initial }: { initial: QuizSessionData }) {
               );
             })}
           </ol>
+          )}
 
-          {!result && questions && (
+          {!result && questions && !started && (
+            <button className="primary big" onClick={start}>
+              開始作答（會蓋住原文）
+            </button>
+          )}
+
+          {!result && questions && started && (
             <>
               {confirming ? (
                 <div className="quiz-confirm">
